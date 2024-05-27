@@ -1,0 +1,15 @@
+torch
+hydra-core
+wandb
+tensorboard
+lightning
+pandas
+datasets
+accelerate
+transformers
+scikit-learn
+einops
+bitsandbytes
+sentence_transformers
+sentencepiece
+mwparserfromhell

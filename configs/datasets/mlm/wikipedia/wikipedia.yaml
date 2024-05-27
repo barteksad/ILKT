@@ -1,0 +1,10 @@
+_target_: dataset.WikipediaDataset
+name: "wikipedia"
+language: "pl"
+date: "20240520"
+streaming: True
+split: "train"
+n_examples: 1000
+max_length: ${exp.max_length}
+mlm_probability: 0.15
+batch_size: ${exp.batch_size}

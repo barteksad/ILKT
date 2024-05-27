@@ -1,0 +1,17 @@
+# train_config.yaml
+
+defaults:
+  - _self_
+  - model: starter
+  - datasets:
+    - contrastive/sentence-compression/sentence-compression.yaml
+    - mlm/wikipedia/wikipedia.yaml
+
+exp:
+  log_dir: # set during runtime to automatically created dir
+  pretrained_model_name_or_path: "microsoft/mdeberta-v3-base"
+  max_length: 128
+  batch_size: 4
+
+wandb:
+  project: "inter-lingual_knowledge_transferring_in_NLP_embeddings"
