@@ -3,6 +3,7 @@ from random import sample
 import torch
 from datasets import load_dataset
 from transformers import DataCollatorWithPadding, PreTrainedTokenizer
+from typing import Any, Dict
 
 from .base import ContrastiveDataset
 
@@ -22,10 +23,10 @@ class SetDataset(ContrastiveDataset):
 
         super().__init__(tokenizer, batch_size)
 
-        self.dataset = load_dataset(name, split)["train"]
+        self.dataset = load_dataset(name, split)["train"]  # type: ignore
         if isinstance(use_rows, float):
             use_rows = int(use_rows * len(self.dataset))
-        self.dataset = self.dataset.shuffle(seed=42)
+        self.dataset = self.dataset.shuffle(seed=42)  # type: ignore
         self.dataset = self.dataset.select(range(use_rows))
         self.max_length = max_length
 
@@ -56,3 +57,20 @@ class SetDataset(ContrastiveDataset):
             return {"set": inputs, "labels": labels}
 
         return _collate_df
+
+    def format_for_loss_fn(self, batch: Dict[str, Any]) -> Dict[str, Any]:
+        # TODO this set dataset has always two pairs so we are not missing anything here but this is not generic
+        outputs = batch["set"]
+        labels = batch["labels"]
+
+        mask1 = labels[:-1] == labels[1:]
+        mask2 = labels[1:] == labels[:-1]
+
+        outputs1 = outputs[:-1][mask1 == 1, :]
+        outputs2 = outputs[1:][mask2 == 1, :]
+
+        return {
+            "output1": outputs1,
+            "output2": outputs2,
+            "target": mask1[mask1 == 1].float().unsqueeze(-1),
+        }

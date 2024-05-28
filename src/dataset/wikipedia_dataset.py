@@ -1,6 +1,8 @@
-from .base import MLMDataset
 from datasets import load_dataset
+from torch.utils.data import DataLoader
 from transformers import PreTrainedTokenizer
+
+from .base import MLMDataset
 
 
 class WikipediaDataset(MLMDataset):
@@ -40,3 +42,13 @@ class WikipediaDataset(MLMDataset):
         text = row["text"]
 
         return self.tokenizer(text, truncation=True, max_length=self.max_length)
+
+    def get_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self,
+            collate_fn=self.get_data_collator(),
+            batch_size=self.batch_size,
+            num_workers=1,
+            pin_memory=True,
+            shuffle=False,
+        )

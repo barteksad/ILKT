@@ -15,8 +15,8 @@ class ILKTConfig(PretrainedConfig):
         **kwargs
     ):
 
-        self.backbone_config = backbone_config
-        self.embedding_head_config = embedding_head_config
-        self.mlm_head_config = mlm_head_config
+        self.backbone_config = dict(**backbone_config)
+        self.embedding_head_config = dict(**embedding_head_config)
+        self.mlm_head_config = dict(**mlm_head_config)
 
         super().__init__(**kwargs)

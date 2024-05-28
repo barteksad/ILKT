@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict
 from torch.utils.data import DataLoader, Dataset
 from transformers import DataCollatorForLanguageModeling, PreTrainedTokenizer
+from losses import CosineSimilarityLoss
 
 # Pairs: ["text1", "text2"] - This is a positive pair that should be close in vector space.
 # Triplets: ["anchor", "positive", "negative"] - This is a triplet: The positive text should be close to the anchor, while the negative text should be distant to the anchor.
@@ -12,7 +13,11 @@ from transformers import DataCollatorForLanguageModeling, PreTrainedTokenizer
 
 class TextDataset(ABC, Dataset):
 
-    def __init__(self, tokenizer: PreTrainedTokenizer, batch_size: int):
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        batch_size: int,
+    ):
         self.tokenizer = tokenizer
         self.batch_size = batch_size
 
@@ -20,20 +25,27 @@ class TextDataset(ABC, Dataset):
     def get_data_collator(self) -> Any:
         raise NotImplementedError
 
-    @abstractmethod
-    def get_dataloader(self) -> DataLoader:
-        raise NotImplementedError
-    
     def get_dataloader(self) -> DataLoader:
         return DataLoader(
-            self, collate_fn=self.get_data_collator(), batch_size=self.batch_size, num_workers=1, pin_memory=True
+            self,
+            collate_fn=self.get_data_collator(),
+            batch_size=self.batch_size,
+            num_workers=1,
+            pin_memory=True,
+            shuffle=True
         )
 
 
 class ContrastiveDataset(TextDataset):
 
-    def __init__(self, tokenizer: PreTrainedTokenizer, batch_size: int):
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        batch_size: int,
+        loss_fn=CosineSimilarityLoss(),
+    ):
         super().__init__(tokenizer, batch_size)
+        self.loss_fn = loss_fn
 
     @abstractmethod
     def __len__(self) -> int:
@@ -46,6 +58,11 @@ class ContrastiveDataset(TextDataset):
     @abstractmethod
     def get_data_collator(self) -> Any:
         raise NotImplementedError
+
+    @abstractmethod
+    def format_for_loss_fn(self, batch: Dict[str, Any]) -> Dict[str, Any]:
+        raise NotImplementedError
+
 
 class MLMDataset(TextDataset):
 

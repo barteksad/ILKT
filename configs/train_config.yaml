@@ -12,6 +12,17 @@ exp:
   pretrained_model_name_or_path: "microsoft/mdeberta-v3-base"
   max_length: 128
   batch_size: 4
+  seed: 42
+  epochs: 1
+  steps_per_epoch: 10
+  optimizer:
+    _target_: torch.optim.AdamW
+    lr: 5e-5
+
+fabric:
+  _target_: lightning.Fabric
+  num_nodes: 1
+  devices: 1
 
 wandb:
   project: "inter-lingual_knowledge_transferring_in_NLP_embeddings"

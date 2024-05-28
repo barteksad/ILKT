@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import torch
 import torch.nn as nn
@@ -39,16 +39,21 @@ class MLMHead(nn.Module):
 
         self.head = nn.Linear(backbone_hidden_size, vocab_size)
 
-    def forward(self, backbone_output: BaseModelOutput, **kwargs) -> MaskedLMOutput:
+    def forward(
+        self,
+        backbone_output: BaseModelOutput,
+        labels: Optional[torch.Tensor] = None,
+        **kwargs,
+    ) -> MaskedLMOutput:
         prediction_scores = self.head(backbone_output.last_hidden_state)
 
         loss = None
-        if "labels" in kwargs:
+        if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(
                 prediction_scores.view(-1, prediction_scores.size(-1)),
-                kwargs["labels"].view(-1),
-            )   
+                labels.view(-1),
+            )
         return MaskedLMOutput(loss=loss)
 
 
@@ -90,12 +95,16 @@ class ILKTModel(PreTrainedModel):
         return embedding_output
 
     def get_mlm_output(
-        self, input_ids: torch.Tensor, attention_mask: torch.Tensor, **kwargs
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        labels: Optional[torch.Tensor] = None,
+        **kwargs,
     ):
         backbone_output: BaseModelOutput = self.backbone(
             input_ids=input_ids, attention_mask=attention_mask, **kwargs
         )
 
-        mlm_output = self.mlm_head(backbone_output, **kwargs)
+        mlm_output = self.mlm_head(backbone_output, labels, **kwargs)
 
         return mlm_output
