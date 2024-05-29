@@ -58,13 +58,13 @@ def main(config: DictConfig):
     optimizer = instantiate(config.exp.optimizer, params=model.parameters())
     model, optimizer = fabric.setup(model, optimizer)
 
-    EPOCHS = config.exp.epochs
-    STEPS_PER_EPOCH = config.exp.steps_per_epoch
+    TRAINING_STEPS = config.exp.training_steps
 
-    for epoch in range(EPOCHS):
-        current_step = 0
-        iter_dataloaders = [iter(dataloader) for dataloader in dataloaders]
+    current_step = 0
+    iter_dataloaders = [iter(dataloader) for dataloader in dataloaders]
 
+    while current_step < TRAINING_STEPS:
+        optimizer.zero_grad()
         for idx, dataset in enumerate(datasets):
             try:
                 batch = next(iter_dataloaders[idx])  # type: ignore
@@ -83,16 +83,17 @@ def main(config: DictConfig):
                 outputs = model.get_mlm_output(**batch)
                 loss = outputs.loss
 
-            optimizer.zero_grad()
             fabric.backward(loss)
-            optimizer.step()
 
-            current_step += 1
-            if current_step >= STEPS_PER_EPOCH:
-                break
+        optimizer.step()
+        current_step += 1
 
     # TODO make it save properly, right now doesnt work
+    model.config.register_for_auto_class()
+    model.register_for_auto_class("AutoModel")
+
     model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+    tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
 
 
 if __name__ == "__main__":

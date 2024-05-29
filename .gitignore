@@ -3,3 +3,4 @@ env
 outputs
 .env
 **__pycache__
+slurm_logs

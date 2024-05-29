@@ -9,9 +9,9 @@ class ILKTConfig(PretrainedConfig):
 
     def __init__(
         self,
-        backbone_config: Dict[str, Any],
-        embedding_head_config: Dict[str, Any],
-        mlm_head_config: Dict[str, Any],
+        backbone_config: Dict[str, Any] = {},
+        embedding_head_config: Dict[str, Any] = {},
+        mlm_head_config: Dict[str, Any] = {},
         **kwargs
     ):
 
