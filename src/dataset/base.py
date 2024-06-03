@@ -15,9 +15,11 @@ class TextDataset(ABC, Dataset):
 
     def __init__(
         self,
+        name: str,
         tokenizer: PreTrainedTokenizer,
         batch_size: int,
     ):
+        self.name = "--".join(name.split("/"))
         self.tokenizer = tokenizer
         self.batch_size = batch_size
 
@@ -32,7 +34,7 @@ class TextDataset(ABC, Dataset):
             batch_size=self.batch_size,
             num_workers=1,
             pin_memory=True,
-            shuffle=True
+            shuffle=True,
         )
 
 
@@ -40,11 +42,12 @@ class ContrastiveDataset(TextDataset):
 
     def __init__(
         self,
+        name: str,
         tokenizer: PreTrainedTokenizer,
         batch_size: int,
         loss_fn=CosineSimilarityLoss(),
     ):
-        super().__init__(tokenizer, batch_size)
+        super().__init__(name, tokenizer, batch_size)
         self.loss_fn = loss_fn
 
     @abstractmethod
@@ -67,9 +70,13 @@ class ContrastiveDataset(TextDataset):
 class MLMDataset(TextDataset):
 
     def __init__(
-        self, tokenizer: PreTrainedTokenizer, batch_size: int, mlm_probability: float
+        self,
+        name: str,
+        tokenizer: PreTrainedTokenizer,
+        batch_size: int,
+        mlm_probability: float,
     ):
-        super().__init__(tokenizer, batch_size)
+        super().__init__(name, tokenizer, batch_size)
         self.mlm_probability = mlm_probability
 
     @abstractmethod

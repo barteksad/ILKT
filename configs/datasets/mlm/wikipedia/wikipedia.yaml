@@ -1,7 +1,7 @@
 _target_: dataset.WikipediaDataset
 name: "wikipedia"
 language: "pl"
-date: "20240520"
+date: "20240201"
 streaming: True
 split: "train"
 n_examples: 1000

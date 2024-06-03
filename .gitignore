@@ -1,6 +1,9 @@
 env
+.env
 .vscode
 outputs
 .env
 **__pycache__
 slurm_logs
+wandb
+benchmarks/pl-mteb/env

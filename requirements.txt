@@ -13,3 +13,4 @@ bitsandbytes
 sentence_transformers
 sentencepiece
 mwparserfromhell
+huggingface_cli

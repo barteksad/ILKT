@@ -15,8 +15,10 @@ exp:
   seed: 42
   training_steps: 10
   optimizer:
-    _target_: torch.optim.AdamW
+    opt: "adamw"
     lr: 5e-5
+    weight_decay: 0.0
+    filter_bias_and_bn: true
 
 fabric:
   _target_: lightning.Fabric

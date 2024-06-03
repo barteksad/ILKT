@@ -19,7 +19,7 @@ class WikipediaDataset(MLMDataset):
         max_length: int,
         mlm_probability: float,
     ):
-        super().__init__(tokenizer, batch_size, mlm_probability)
+        super().__init__(name, tokenizer, batch_size, mlm_probability)
 
         self.dataset = load_dataset(
             name, language=language, date=date, split=split, streaming=streaming

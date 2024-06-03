@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --time 4:00:00
 #SBATCH --job-name=train
-#SBATCH --output=slurm_logs/train-%A-%a.log
+#SBATCH --output=slurm_logs/train-%A.log
 
 # echo file content to logs
 script_path=$(readlink -f "$0")

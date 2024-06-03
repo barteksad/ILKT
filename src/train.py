@@ -3,6 +3,7 @@ import os
 from typing import List
 
 import hydra
+import wandb
 from hydra.utils import instantiate
 from lightning import Fabric
 from omegaconf import DictConfig
@@ -10,6 +11,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 
 import utils
 from dataset import ContrastiveDataset, MLMDataset
+from train_util import create_optimizer_v2
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +57,7 @@ def main(config: DictConfig):
     ]
 
     model = instantiate(config.model)
-    optimizer = instantiate(config.exp.optimizer, params=model.parameters())
+    optimizer = create_optimizer_v2(model, **config.exp.optimizer)
     model, optimizer = fabric.setup(model, optimizer)
 
     TRAINING_STEPS = config.exp.training_steps
@@ -73,15 +75,16 @@ def main(config: DictConfig):
                 batch = next(iter_dataloaders[idx])  # type: ignore
 
             if isinstance(dataset, ContrastiveDataset):
-                # TODO handle keys in batch somehow better, this is poor
-                outputs = model.get_sentence_embedding(**batch["set"])
+                outputs = model.get_sentence_embedding(**batch["model_inputs"])  # type: ignore
                 outputs = dataset.format_for_loss_fn(
-                    {"set": outputs.pooler_output, "labels": batch["labels"]}
+                    {"model_outputs": outputs.pooler_output, "labels": batch["labels"]}  # type: ignore
                 )
                 loss = dataset.loss_fn(**outputs)
             else:
                 outputs = model.get_mlm_output(**batch)
                 loss = outputs.loss
+
+            wandb.log({f"train/{dataset.name}/loss": loss.item()})
 
             fabric.backward(loss)
 
@@ -94,6 +97,14 @@ def main(config: DictConfig):
 
     model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
     tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+
+    # WARNING if you hange this, also hange in benchmarks where we do:
+    # if name.startswith("ILKT"):
+    #             group, name = name.split("/")[-1].split("_")
+    # to distinguish between our models and others and save everything in wandb
+    group, name = str(config.exp.log_dir).split("/")[-2:]
+    model.push_to_hub(f"ILKT/{group}_{name}")
+    tokenizer.push_to_hub(f"ILKT/{group}_{name}")
 
 
 if __name__ == "__main__":

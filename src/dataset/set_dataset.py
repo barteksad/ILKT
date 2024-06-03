@@ -20,8 +20,7 @@ class SetDataset(ContrastiveDataset):
         max_length: int,
         **kwargs
     ):
-
-        super().__init__(tokenizer, batch_size)
+        super().__init__(name, tokenizer, batch_size)
 
         self.dataset = load_dataset(name, split)["train"]  # type: ignore
         if isinstance(use_rows, float):
@@ -54,13 +53,13 @@ class SetDataset(ContrastiveDataset):
 
             inputs = data_collator(sum([example["set"] for example in batch], []))
 
-            return {"set": inputs, "labels": labels}
+            return {"model_inputs": inputs, "labels": labels}
 
         return _collate_df
 
     def format_for_loss_fn(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         # TODO this set dataset has always two pairs so we are not missing anything here but this is not generic
-        outputs = batch["set"]
+        outputs = batch["model_outputs"]
         labels = batch["labels"]
 
         mask1 = labels[:-1] == labels[1:]

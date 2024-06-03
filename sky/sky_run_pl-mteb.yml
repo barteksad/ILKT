@@ -1,0 +1,35 @@
+name: run-pl-mteb
+
+workdir: ./benchmarks/pl-mteb
+
+resources:
+  cloud: aws
+  region: us-east-1
+  instance_type: g5.xlarge
+  accelerators: A10G:1
+
+envs:
+  WANDB_API_KEY: null
+  HF_TOKEN: null
+  MODEL_NAME: null
+  MODEL_TYPE: "T"
+
+setup: |
+  set -e
+  conda activate pytorch
+  rm -rf .git
+  sudo apt-get update
+  sudo apt-get install -y git
+  pip install -r requirements.txt
+  pip install scipy==1.10.1
+  pip install mteb==1.12.5
+  pip install pydantic==2.7.2
+  wandb login $WANDB_API_KEY
+  huggingface-cli login --token $HF_TOKEN
+  echo '[{"model_name": "'"$MODEL_NAME"'","model_abbr": "","model_type": "'"$MODEL_TYPE"'"}]' > configs/transformer_embeddings.json
+
+run: |
+  set -e  # Exit if any command failed.
+  conda activate pytorch
+  python run_evaluation.py --models_config configs/transformer_embeddings.json
+  python create_hf_model_card.py $MODEL_NAME
