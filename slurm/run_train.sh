@@ -10,7 +10,7 @@
 script_path=$(readlink -f "$0")
 cat $script_path
 
-cd /home/barteksad/ILKT
+cd ~/ILKT
 source env/bin/activate
 
 wandb online

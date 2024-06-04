@@ -15,7 +15,7 @@ model_types = [
     "SWE",  # Static Word Embedding
 ]
 
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 

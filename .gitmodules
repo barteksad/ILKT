@@ -1,3 +1,0 @@
-[submodule "benchmarks/pl-mteb"]
-	path = benchmarks/pl-mteb
-	url = git@github.com:rafalposwiata/pl-mteb.git

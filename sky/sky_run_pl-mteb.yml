@@ -1,6 +1,6 @@
 name: run-pl-mteb
 
-workdir: ./benchmarks/pl-mteb
+workdir: ./benchmarks/src-pl-mteb
 
 resources:
   cloud: aws
@@ -22,7 +22,7 @@ setup: |
   sudo apt-get install -y git
   pip install -r requirements.txt
   pip install scipy==1.10.1
-  pip install mteb==1.12.5
+  pip install mteb==1.12.16
   pip install pydantic==2.7.2
   wandb login $WANDB_API_KEY
   huggingface-cli login --token $HF_TOKEN

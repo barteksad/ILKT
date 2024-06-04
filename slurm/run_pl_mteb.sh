@@ -15,7 +15,7 @@ MODEL_TYPE="T"
 
 wandb online
 
-cd /home/barteksad/ILKT/benchmarks/pl-mteb
+cd ~/ILKT/benchmarks/src-pl-mteb
 source env/bin/activate
 
 echo '[{"model_name": "'"$MODEL_NAME"'","model_abbr": "","model_type": "'"$MODEL_TYPE"'"}]' > configs/transformer_embeddings.json

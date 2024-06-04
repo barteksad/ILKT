@@ -1,33 +1,3 @@
-"""
-Taken from:
-https://github.com/embeddings-benchmark/mteb/blob/main/scripts/mteb_meta.py
-https://huggingface.co/docs/huggingface_hub/en/guides/model-cards#share-model-cards
-"""
-
-"""Usage: python mteb_meta.py path_to_results_folder
-
-Creates evaluation results metadata for the model card.
-E.g.
----
-tags:
-- mteb
-model-index:
-- name: SGPT-5.8B-weightedmean-msmarco-specb-bitfit
-  results:
-  - task:
-      type: classification
-    dataset:
-      type: mteb/banking77
-      name: MTEB Banking77
-      config: default
-      split: test
-      revision: 44fa15921b4c889113cc5df03dd4901b49161ab7
-    metrics:
-    - type: accuracy
-      value: 84.49350649350649
----
-"""
-
 from __future__ import annotations
 
 import json
@@ -45,7 +15,6 @@ model_name = repo_id.split("/")[-1]
 results_folder = f"results/{model_name}"
 
 all_results = {}
-
 for file_name in os.listdir(results_folder):
     if not file_name.endswith(".json"):
         logger.info(f"Skipping non-json {file_name}")
@@ -172,5 +141,5 @@ if repo_id.startswith("ILKT"):
 
     url = create_repo(repo_id, exist_ok=True)
 
-    card = ModelCard(META_STRING)
+    card = ModelCard(META_STRING, ignore_metadata_errors=True)
     card.push_to_hub(repo_id)

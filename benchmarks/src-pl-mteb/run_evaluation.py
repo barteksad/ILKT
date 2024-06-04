@@ -10,7 +10,7 @@ from models import (
     TransformerModel,
 )
 from transformers import HfArgumentParser
-from tasks import TaskInfo, tasks, new_tasks
+from tasks import TaskInfo, tasks, new_tasks, get_main_metric
 from dataclasses import dataclass, field
 from utils import from_dict
 
@@ -42,33 +42,33 @@ class PlMtebEvaluator:
             print(f"Evaluating model: {model_info.model_name}")
             group, name = None, model_info.model_name
             if name.startswith("ILKT"):
-                group, name = name.split("/")[-1].split("_")
-            wandb.init(
-                project="inter-lingual_knowledge_transferring_in_NLP_embeddings",
-                name=name,
-                group=group,
-                resume="allow",
-            )
+                name = name.split("/")[-1]
+            # wandb.init(
+            #     project="inter-lingual_knowledge_transferring_in_NLP_embeddings",
+            #     name=name,
+            #     group=group,
+            #     resume="allow",
+            # )
 
             base_model = self._prepare_base_model(model_info)
             for task_info in tasks:
-                model = self._prepare_task_model(base_model, model_info, task_info)
-                task = self._get_task(task_info)
-                eval_splits = (
-                    ["validation"] if task_info.name == "MSMARCO-PL" else ["test"]
-                )
-                evaluation = MTEB(tasks=[task], task_langs=["pl"])
-                evaluation.run(
-                    model,
-                    eval_splits=eval_splits,
-                    output_folder=f"results/{model_info.get_simple_name()}",
-                )
+                try:
+                    model = self._prepare_task_model(base_model, model_info, task_info)
+                    task = self._get_task(task_info)
+                    eval_splits = (
+                        ["validation"] if task_info.name == "MSMARCO-PL" else ["test"]
+                    )
+                    evaluation = MTEB(tasks=[task], task_langs=["pl"])
+                    evaluation.run(
+                        model,
+                        eval_splits=eval_splits,
+                        output_folder=f"results/{name}",
+                    )
 
-                with open(
-                    f"results/{model_info.get_simple_name()}/{task_info.name}.json", "r"
-                ) as f:
-                    results = json.load(f)
-                    wandb.log(results)
+                except Exception as e:
+                    print(f"Error during evaluation of {task_info.name}: {e}")
+
+        wandb.finish()
 
     @staticmethod
     def _prepare_base_model(model_info: ModelInfo):
