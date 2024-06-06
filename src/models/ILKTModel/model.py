@@ -18,13 +18,15 @@ class SentenceEmbeddingHead(nn.Module):
         self, backbone_hidden_size: int, embedding_head_config: Dict[str, Any]
     ):
         super().__init__()
+        self.config = embedding_head_config
 
     def forward(
         self, backbone_output: BaseModelOutput, **kwargs
     ) -> BaseModelOutputWithPooling:
-        return BaseModelOutputWithPooling(
-            pooler_output=backbone_output.last_hidden_state[:, 0, :]  # type: ignore
-        )
+        embeddings = backbone_output.last_hidden_state[:, 0, :]  # type: ignore
+        if self.config["normalize_embeddings"]:
+            embeddings = nn.functional.normalize(embeddings, p=2, dim=-1)
+        return BaseModelOutputWithPooling(pooler_output=embeddings) # type: ignore
 
 
 class MLMHead(nn.Module):

@@ -4,6 +4,7 @@ from typing import List
 
 import hydra
 import wandb
+from tqdm.auto import tqdm
 from hydra.utils import instantiate
 from lightning import Fabric
 from omegaconf import DictConfig
@@ -65,6 +66,7 @@ def main(config: DictConfig):
     current_step = 0
     iter_dataloaders = [iter(dataloader) for dataloader in dataloaders]
 
+    pbar = tqdm(total=TRAINING_STEPS)
     while current_step < TRAINING_STEPS:
         optimizer.zero_grad()
         for idx, dataset in enumerate(datasets):
@@ -75,11 +77,12 @@ def main(config: DictConfig):
                 batch = next(iter_dataloaders[idx])  # type: ignore
 
             if isinstance(dataset, ContrastiveDataset):
-                outputs = model.get_sentence_embedding(**batch["model_inputs"])  # type: ignore
-                outputs = dataset.format_for_loss_fn(
-                    {"model_outputs": outputs.pooler_output, "labels": batch["labels"]}  # type: ignore
+                model_outputs = (
+                    model.get_sentence_embedding(**inp).pooler_output for inp in batch["model_inputs"]  # type: ignore
                 )
-                loss = dataset.loss_fn(**outputs)
+                loss = dataset.get_loss(
+                    {"model_outputs": model_outputs, "labels": batch["labels"] if "labels" in batch else None}  # type: ignore
+                )
             else:
                 outputs = model.get_mlm_output(**batch)
                 loss = outputs.loss
@@ -90,6 +93,7 @@ def main(config: DictConfig):
 
         optimizer.step()
         current_step += 1
+        pbar.update(1)
 
     # TODO make it save properly, right now doesnt work
     model.config.register_for_auto_class()

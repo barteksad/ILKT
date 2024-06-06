@@ -1,0 +1,10 @@
+_target_: dataset.TripletDataset
+name: "sentence-transformers/msmarco-msmarco-distilbert-base-tas-b"
+split: "train"
+n_examples: 100000 # either a float between 0 and 1 or an integer
+max_length: ${exp.max_length}
+batch_size: ${exp.batch_size}
+loss_fn:
+  _target_: sentence_transformers.losses.TripletLoss
+  model:
+    _target_: torch.nn.Identity

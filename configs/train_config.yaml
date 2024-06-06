@@ -4,7 +4,8 @@ defaults:
   - _self_
   - model: starter
   - datasets:
-    - contrastive/sentence-compression/sentence-compression.yaml
+    - contrastive/all-nli/all-nli-pair-score.yaml
+    - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
     - mlm/wikipedia/wikipedia.yaml
 
 exp:
@@ -27,3 +28,4 @@ fabric:
 
 wandb:
   project: "inter-lingual_knowledge_transferring_in_NLP_embeddings"
+  entity: "top-notch-nlp"

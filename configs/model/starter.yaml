@@ -6,4 +6,5 @@ config:
     trust_remote_code: true
   embedding_head_config:
     pool_type: "cls"
+    normalize_embeddings: true
   mlm_head_config: {}

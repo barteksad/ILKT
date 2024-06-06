@@ -27,6 +27,7 @@ def setup_wandb(config):
         dir=config.exp.log_dir,
         group=group,
         name=name,
+        entity=config.wandb.entity,
         config=wandb_config,
         sync_tensorboard=True,
     )

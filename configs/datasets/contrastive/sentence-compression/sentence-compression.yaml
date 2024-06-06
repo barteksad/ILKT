@@ -1,6 +1,0 @@
-_target_: dataset.SetDataset
-name: "embedding-data/sentence-compression"
-split: "default"
-use_rows: 0.01 # either a float between 0 and 1 or an integer
-max_length: ${exp.max_length}
-batch_size: ${exp.batch_size}
