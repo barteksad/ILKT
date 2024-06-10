@@ -21,30 +21,24 @@ class WikipediaDataset(MLMDataset):
         super().__init__(name, tokenizer, batch_size, mlm_probability)
 
         self.dataset = load_dataset(
-            name, language=language, date=date, split=split
+            name, language=language, date=date, split=split, streaming=True
         )
-        self.dataset = self.dataset.shuffle(seed=42)
+        self.dataset = self.dataset.shuffle()
         self.n_examples = n_examples
         self.max_length = max_length
 
     def reset(self):
-        self.dataset.shuffle(seed=42)
+        self.dataset = self.dataset.shuffle()
+        self.ds_iter = iter(self.dataset)
 
     def __len__(self) -> int:
         return self.n_examples
 
     def __getitem__(self, idx: int):
-        row = self.dataset[idx]
+        if idx == 0:
+            self.reset()
+
+        row = next(self.ds_iter)
         text = row["text"]
 
         return self.tokenizer(text, truncation=True, max_length=self.max_length)
-
-    def get_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self,
-            collate_fn=self.get_data_collator(),
-            batch_size=self.batch_size,
-            num_workers=2,
-            pin_memory=True,
-            shuffle=True,
-        )

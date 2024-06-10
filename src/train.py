@@ -30,19 +30,19 @@ def instantiate_datasets(
     config: DictConfig, tokenizer: PreTrainedTokenizer
 ) -> List[ContrastiveDataset | MLMDataset]:
     datasets = []
-    if config.datasets.contrastive is not None:
+    if 'contrastive' in config.datasets is not None:
         for contrastive_dataset_config in config.datasets.contrastive.values():
             contrastive_dataset = instantiate(
                 contrastive_dataset_config, tokenizer=tokenizer
             )
             datasets.append(contrastive_dataset)
 
-    if config.datasets.mlm is not None:
+    if 'mlm' in config.datasets:
         for mlm_dataset_config in config.datasets.mlm.values():
             mlm_dataset = instantiate(mlm_dataset_config, tokenizer=tokenizer)
             datasets.append(mlm_dataset)
 
-    if config.datasets.sentence_classification is not None:
+    if 'sentence_classification' in config.datasets is not None:
         for cls_dataset_config in config.datasets.sentence_classification.values():
             cls_dataset = instantiate(cls_dataset_config, tokenizer=tokenizer)
             datasets.append(cls_dataset)
