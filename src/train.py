@@ -139,35 +139,36 @@ def main(config: DictConfig):
         optimizer.step()
 
         # ----------------- validation -----------------
-        model.eval()
-        for idx, dataloader in enumerate(val_dataloaders):
-            try:
-                batch = next(iter_val_dataloaders[idx])  # type: ignore
-            except StopIteration:
-                iter_dataloaders[idx] = iter(iter_val_dataloaders[idx])  # type: ignore
-                batch = next(iter_val_dataloaders[idx])  # type: ignore
-            with torch.no_grad():
-                # tutaj wiadomo to jest do posprzątania
-                if isinstance(dataloader.dataset, ContrastiveDataset):
-                    model_outputs = (
-                        model.get_sentence_embedding(**inp).pooler_output
-                        for inp in batch["model_inputs"]  # type: ignore
-                    )
-                    loss = dataloader.dataset.get_loss(
-                        {
-                            "model_outputs": model_outputs,
-                            "labels": batch["labels"] if "labels" in batch else None,  # type: ignore
-                        }
-                    )
-                elif isinstance(dataloader.dataset, SentenceClassificationDataset):
-                    outputs = model.get_cls_output(**batch, head_name=dataloader.dataset.name)
-                    loss = outputs.loss
-                elif isinstance(dataloader.dataset, MLMDataset):
-                    outputs = model.get_mlm_output(**batch)
-                    loss = outputs.loss
-                else:
-                    raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
-                wandb.log({f"val/{dataloader.dataset.name}/loss": loss.item()})
+        if current_step % config.exp.validate_every == 0:
+            model.eval()
+            for idx, dataloader in enumerate(val_dataloaders):
+                try:
+                    batch = next(iter_val_dataloaders[idx])  # type: ignore
+                except StopIteration:
+                    iter_dataloaders[idx] = iter(iter_val_dataloaders[idx])  # type: ignore
+                    batch = next(iter_val_dataloaders[idx])  # type: ignore
+                with torch.no_grad():
+                    # tutaj wiadomo to jest do posprzątania
+                    if isinstance(dataloader.dataset, ContrastiveDataset):
+                        model_outputs = (
+                            model.get_sentence_embedding(**inp).pooler_output
+                            for inp in batch["model_inputs"]  # type: ignore
+                        )
+                        loss = dataloader.dataset.get_loss(
+                            {
+                                "model_outputs": model_outputs,
+                                "labels": batch["labels"] if "labels" in batch else None,  # type: ignore
+                            }
+                        )
+                    elif isinstance(dataloader.dataset, SentenceClassificationDataset):
+                        outputs = model.get_cls_output(**batch, head_name=dataloader.dataset.name)
+                        loss = outputs.loss
+                    elif isinstance(dataloader.dataset, MLMDataset):
+                        outputs = model.get_mlm_output(**batch)
+                        loss = outputs.loss
+                    else:
+                        raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
+                    wandb.log({f"val/{dataloader.dataset.name}/loss": loss.item()})
 
         model.train()
         current_step += 1
