@@ -108,7 +108,7 @@ def main(config: DictConfig):
             try:
                 batch = next(iter_train_dataloaders[idx])  # type: ignore
             except StopIteration:
-                iter_dataloaders[idx] = iter(iter_train_dataloaders[idx])  # type: ignore
+                iter_train_dataloaders[idx] = iter(train_dataloaders[idx])  # type: ignore
                 batch = next(iter_train_dataloaders[idx])  # type: ignore
 
             # TODO Bartek: tu by pewnie elegancko coś na wzór visitora wleciało
@@ -145,7 +145,7 @@ def main(config: DictConfig):
                 try:
                     batch = next(iter_val_dataloaders[idx])  # type: ignore
                 except StopIteration:
-                    iter_dataloaders[idx] = iter(iter_val_dataloaders[idx])  # type: ignore
+                    iter_val_dataloaders[idx] = iter(val_dataloaders[idx])  # type: ignore
                     batch = next(iter_val_dataloaders[idx])  # type: ignore
                 with torch.no_grad():
                     # tutaj wiadomo to jest do posprzątania
