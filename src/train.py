@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 
 torch.set_float32_matmul_precision('high')
 
+
 def get_fabric(config) -> Fabric:
     fabric = instantiate(config.fabric)
     fabric.seed_everything(config.exp.seed)
@@ -27,26 +28,45 @@ def get_fabric(config) -> Fabric:
 
 
 def instantiate_datasets(
-    config: DictConfig, tokenizer: PreTrainedTokenizer
+        config: DictConfig, tokenizer: PreTrainedTokenizer, dataset_type: str
 ) -> List[ContrastiveDataset | MLMDataset]:
     datasets = []
-    if 'contrastive' in config.datasets is not None:
-        for contrastive_dataset_config in config.datasets.contrastive.values():
+    if dataset_type == "train":
+        config_datasets = config.train_datasets
+    elif dataset_type == "val":
+        config_datasets = config.val_datasets
+    else:
+        raise ValueError(f"Unknown dataset type {dataset_type}")
+
+    if 'contrastive' in config_datasets is not None:
+        for contrastive_dataset_config in config_datasets.contrastive.values():
             contrastive_dataset = instantiate(
                 contrastive_dataset_config, tokenizer=tokenizer
             )
             datasets.append(contrastive_dataset)
 
-    if 'mlm' in config.datasets:
-        for mlm_dataset_config in config.datasets.mlm.values():
+    if 'mlm' in config_datasets:
+        for mlm_dataset_config in config_datasets.mlm.values():
             mlm_dataset = instantiate(mlm_dataset_config, tokenizer=tokenizer)
             datasets.append(mlm_dataset)
 
-    if 'sentence_classification' in config.datasets is not None:
-        for cls_dataset_config in config.datasets.sentence_classification.values():
+    if 'sentence_classification' in config_datasets is not None:
+        for cls_dataset_config in config_datasets.sentence_classification.values():
             cls_dataset = instantiate(cls_dataset_config, tokenizer=tokenizer)
             datasets.append(cls_dataset)
     return datasets
+
+
+def prepare_dataloaders(fabric: Fabric, config: DictConfig, tokenizer: PreTrainedTokenizer):
+    train_dataloaders = []
+    train_datasets = instantiate_datasets(config, tokenizer, "train")
+    val_datasets = instantiate_datasets(config, tokenizer, "val")
+    for dataset in train_datasets:
+        train_dataloaders.append(dataset.get_dataloader())
+    val_dataloaders = []
+    for dataset in val_datasets:
+        val_dataloaders.append(dataset.get_dataloader())
+    return fabric.setup_dataloaders(*train_dataloaders), fabric.setup_dataloaders(*val_dataloaders)
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")
@@ -58,11 +78,12 @@ def main(config: DictConfig):
     fabric = get_fabric(config)
 
     tokenizer = AutoTokenizer.from_pretrained(config.exp.pretrained_model_name_or_path)
-    datasets = instantiate_datasets(config, tokenizer)  # type: ignore
-    dataloaders = fabric.setup_dataloaders(*[dataset.get_dataloader() for dataset in datasets])
+    train_dataloaders, val_dataloaders = prepare_dataloaders(fabric, config, tokenizer)
 
     cls_heads = []
-    for dataset in datasets:
+    # setting only for training datasets as this has to be trained, setting val dataset that was not present
+    # in train will raise error
+    for dataset in train_dataloaders:
         if isinstance(dataset, SentenceClassificationDataset):
             cls_heads.append((dataset.n_classes, dataset.name))
 
@@ -74,39 +95,43 @@ def main(config: DictConfig):
     TRAINING_STEPS = config.exp.training_steps
 
     current_step = 0
-    iter_dataloaders = [iter(dataloader) for dataloader in dataloaders]
+    # TODO Bartek: dlaczego nie tworzysz iteratora za każdym razem w pętli tylko trzymasz je w tej liście?
+    #  To nie wydaje się szczególnie kosztowne a było by czyściej
+    iter_train_dataloaders = [iter(dataloader) for dataloader in train_dataloaders]
 
     pbar = tqdm(total=TRAINING_STEPS)
     while current_step < TRAINING_STEPS:
         optimizer.zero_grad()
-        for idx, dataset in enumerate(datasets):
+        for idx, dataloader in enumerate(train_dataloaders):
+
             try:
-                batch = next(iter_dataloaders[idx])  # type: ignore
+                batch = next(iter_train_dataloaders[idx])  # type: ignore
             except StopIteration:
                 iter_dataloaders[idx] = iter(dataloaders[idx])  # type: ignore
-                batch = next(iter_dataloaders[idx])  # type: ignore
+                batch = next(iter_train_dataloaders[idx])  # type: ignore
 
-            if isinstance(dataset, ContrastiveDataset):
+            # TODO Bartek: tu by pewnie elegancko coś na wzór visitora wleciało
+            if isinstance(dataloader.dataset, ContrastiveDataset):
                 model_outputs = (
                     model.get_sentence_embedding(**inp).pooler_output
                     for inp in batch["model_inputs"]  # type: ignore
                 )
-                loss = dataset.get_loss(
+                loss = dataloader.dataset.get_loss(
                     {
                         "model_outputs": model_outputs,
                         "labels": batch["labels"] if "labels" in batch else None,  # type: ignore
                     }
                 )
-            elif isinstance(dataset, SentenceClassificationDataset):
-                outputs = model.get_cls_output(**batch, head_name=dataset.name)
+            elif isinstance(dataloader.dataset, SentenceClassificationDataset):
+                outputs = model.get_cls_output(**batch, head_name=dataloader.dataset.name)
                 loss = outputs.loss
-            elif isinstance(dataset, MLMDataset):
+            elif isinstance(dataloader.dataset, MLMDataset):
                 outputs = model.get_mlm_output(**batch)
                 loss = outputs.loss
             else:
-                raise ValueError(f"Unknown dataset type {type(dataset)}")
+                raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
 
-            wandb.log({f"train/{dataset.name}/loss": loss.item()})
+            wandb.log({f"train/{dataloader.dataset.name}/loss": loss.item()})
 
             fabric.backward(loss)
 
