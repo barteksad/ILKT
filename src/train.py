@@ -98,6 +98,7 @@ def main(config: DictConfig):
     # TODO Bartek: dlaczego nie tworzysz iteratora za każdym razem w pętli tylko trzymasz je w tej liście?
     #  To nie wydaje się szczególnie kosztowne a było by czyściej
     iter_train_dataloaders = [iter(dataloader) for dataloader in train_dataloaders]
+    iter_val_dataloaders = [iter(dataloader) for dataloader in val_dataloaders]
 
     pbar = tqdm(total=TRAINING_STEPS)
     while current_step < TRAINING_STEPS:
@@ -107,7 +108,7 @@ def main(config: DictConfig):
             try:
                 batch = next(iter_train_dataloaders[idx])  # type: ignore
             except StopIteration:
-                iter_dataloaders[idx] = iter(dataloaders[idx])  # type: ignore
+                iter_dataloaders[idx] = iter(iter_train_dataloaders[idx])  # type: ignore
                 batch = next(iter_train_dataloaders[idx])  # type: ignore
 
             # TODO Bartek: tu by pewnie elegancko coś na wzór visitora wleciało
@@ -136,6 +137,39 @@ def main(config: DictConfig):
             fabric.backward(loss)
 
         optimizer.step()
+
+        # ----------------- validation -----------------
+        model.eval()
+        for idx, dataloader in enumerate(val_dataloaders):
+            try:
+                batch = next(iter_val_dataloaders[idx])  # type: ignore
+            except StopIteration:
+                iter_dataloaders[idx] = iter(iter_val_dataloaders[idx])  # type: ignore
+                batch = next(iter_val_dataloaders[idx])  # type: ignore
+            with torch.no_grad():
+                # tutaj wiadomo to jest do posprzątania
+                if isinstance(dataloader.dataset, ContrastiveDataset):
+                    model_outputs = (
+                        model.get_sentence_embedding(**inp).pooler_output
+                        for inp in batch["model_inputs"]  # type: ignore
+                    )
+                    loss = dataloader.dataset.get_loss(
+                        {
+                            "model_outputs": model_outputs,
+                            "labels": batch["labels"] if "labels" in batch else None,  # type: ignore
+                        }
+                    )
+                elif isinstance(dataloader.dataset, SentenceClassificationDataset):
+                    outputs = model.get_cls_output(**batch, head_name=dataloader.dataset.name)
+                    loss = outputs.loss
+                elif isinstance(dataloader.dataset, MLMDataset):
+                    outputs = model.get_mlm_output(**batch)
+                    loss = outputs.loss
+                else:
+                    raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
+                wandb.log({f"val/{dataloader.dataset.name}/loss": loss.item()})
+
+        model.train()
         current_step += 1
         pbar.update(1)
 
