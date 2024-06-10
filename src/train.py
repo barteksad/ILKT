@@ -4,6 +4,7 @@ from typing import List
 
 import hydra
 import wandb
+import torch
 from tqdm.auto import tqdm
 from hydra.utils import instantiate
 from lightning import Fabric
@@ -16,6 +17,7 @@ from train_util import create_optimizer_v2
 
 log = logging.getLogger(__name__)
 
+torch.set_float32_matmul_precision('high')
 
 def get_fabric(config) -> Fabric:
     fabric = instantiate(config.fabric)
@@ -28,19 +30,19 @@ def instantiate_datasets(
     config: DictConfig, tokenizer: PreTrainedTokenizer
 ) -> List[ContrastiveDataset | MLMDataset]:
     datasets = []
-    if config.datasets.contrastive is not None:
+    if 'contrastive' in config.datasets is not None:
         for contrastive_dataset_config in config.datasets.contrastive.values():
             contrastive_dataset = instantiate(
                 contrastive_dataset_config, tokenizer=tokenizer
             )
             datasets.append(contrastive_dataset)
 
-    if config.datasets.mlm is not None:
+    if 'mlm' in config.datasets:
         for mlm_dataset_config in config.datasets.mlm.values():
             mlm_dataset = instantiate(mlm_dataset_config, tokenizer=tokenizer)
             datasets.append(mlm_dataset)
 
-    if config.datasets.sentence_classification is not None:
+    if 'sentence_classification' in config.datasets is not None:
         for cls_dataset_config in config.datasets.sentence_classification.values():
             cls_dataset = instantiate(cls_dataset_config, tokenizer=tokenizer)
             datasets.append(cls_dataset)
@@ -57,9 +59,7 @@ def main(config: DictConfig):
 
     tokenizer = AutoTokenizer.from_pretrained(config.exp.pretrained_model_name_or_path)
     datasets = instantiate_datasets(config, tokenizer)  # type: ignore
-    dataloaders = [
-        fabric.setup_dataloaders(dataset.get_dataloader()) for dataset in datasets
-    ]
+    dataloaders = fabric.setup_dataloaders(*[dataset.get_dataloader() for dataset in datasets])
 
     cls_heads = []
     for dataset in datasets:

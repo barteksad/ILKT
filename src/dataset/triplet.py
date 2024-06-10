@@ -23,13 +23,13 @@ class TripletDataset(ContrastiveDataset):
         super().__init__(name, tokenizer, batch_size)
 
         self.dataset = load_dataset(name, "triplet", split=split, streaming=True)
-        self.dataset = self.dataset.shuffle()
+        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
         self.n_examples = n_examples
         self.max_length = max_length
         self.loss_fn = loss_fn
-
+        
     def reset(self):
-        self.dataset = self.dataset.shuffle()
+        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
         self.ds_iter = iter(self.dataset)
 
     def __len__(self) -> int:
@@ -66,16 +66,6 @@ class TripletDataset(ContrastiveDataset):
             return {"model_inputs": (query, positive, negative)}
 
         return _collate_df
-
-    def get_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self,
-            collate_fn=self.get_data_collator(),
-            batch_size=self.batch_size,
-            num_workers=1,
-            pin_memory=True,
-            shuffle=False,
-        )
 
     def get_loss(self, batch: Dict[str, Any]) -> torch.Tensor:
         query, positive, negative = batch["model_outputs"]

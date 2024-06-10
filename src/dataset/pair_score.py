@@ -5,9 +5,6 @@ from typing import Any, Dict
 
 from .base import ContrastiveDataset
 
-torch.bfloat16
-
-
 class PairScoreDataset(ContrastiveDataset):
 
     def __init__(
@@ -24,13 +21,13 @@ class PairScoreDataset(ContrastiveDataset):
         super().__init__(name, tokenizer, batch_size)
 
         self.dataset = load_dataset(name, "pair-score", split=split, streaming=True)
-        self.dataset = self.dataset.shuffle(seed=42)  # type: ignore
+        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)  # type: ignore
         self.n_examples = n_examples
         self.max_length = max_length
         self.loss_fn = loss_fn
-
+        
     def reset(self):
-        self.dataset = self.dataset.shuffle()
+        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
         self.ds_iter = iter(self.dataset)
 
     def __len__(self) -> int:
@@ -59,7 +56,7 @@ class PairScoreDataset(ContrastiveDataset):
 
             sentence1 = data_collator([x["sentence1"] for x in batch])
             sentence2 = data_collator([x["sentence2"] for x in batch])
-            labels = torch.tensor([x["labels"] for x in batch], dtype=torch.float32)
+            labels = torch.tensor([x["labels"] for x in batch], dtype=torch.float)
 
             return {"model_inputs": (sentence1, sentence2), "labels": labels}
 
