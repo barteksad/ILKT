@@ -83,9 +83,9 @@ def main(config: DictConfig):
     cls_heads = []
     # setting only for training datasets as this has to be trained, setting val dataset that was not present
     # in train will raise error
-    for dataset in train_dataloaders:
-        if isinstance(dataset, SentenceClassificationDataset):
-            cls_heads.append((dataset.n_classes, dataset.name))
+    for dataloader in train_dataloaders:
+        if isinstance(dataloader.dataset, SentenceClassificationDataset):
+            cls_heads.append((dataloader.dataset.n_classes, dataloader.dataset.name))
 
     config.model.config["cls_heads"] = cls_heads
     model = instantiate(config.model)
