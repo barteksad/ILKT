@@ -24,13 +24,13 @@ class SentenceClassificationDataset(ClassificationDataset):
             name, tokenizer, batch_size, n_classes, sentence_keys, label_key
         )
         self.dataset = load_dataset(name, split=split, streaming=True)
-        self.dataset = self.dataset.shuffle()
+        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
         self.n_examples = n_examples
         self.max_length = max_length
         self.label_mapping = label_mapping
-
+        
     def reset(self):
-        self.dataset = self.dataset.shuffle()
+        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
         self.ds_iter = iter(self.dataset)
 
     def __len__(self) -> int:

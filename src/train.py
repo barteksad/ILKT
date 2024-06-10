@@ -4,6 +4,7 @@ from typing import List
 
 import hydra
 import wandb
+import torch
 from tqdm.auto import tqdm
 from hydra.utils import instantiate
 from lightning import Fabric
@@ -16,6 +17,7 @@ from train_util import create_optimizer_v2
 
 log = logging.getLogger(__name__)
 
+torch.set_float32_matmul_precision('high')
 
 def get_fabric(config) -> Fabric:
     fabric = instantiate(config.fabric)
@@ -57,9 +59,7 @@ def main(config: DictConfig):
 
     tokenizer = AutoTokenizer.from_pretrained(config.exp.pretrained_model_name_or_path)
     datasets = instantiate_datasets(config, tokenizer)  # type: ignore
-    dataloaders = [
-        fabric.setup_dataloaders(dataset.get_dataloader()) for dataset in datasets
-    ]
+    dataloaders = fabric.setup_dataloaders(*[dataset.get_dataloader() for dataset in datasets])
 
     cls_heads = []
     for dataset in datasets:
