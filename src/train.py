@@ -139,6 +139,8 @@ def main(config: DictConfig):
         if current_step % config.exp.validate_every == 0:
             model.eval()
             for idx, dataloader in enumerate(val_dataloaders):
+                running_loss = 0
+                iterations = 0
                 for batch in dataloader:
                     with torch.no_grad():
                         # tutaj wiadomo to jest do posprzątania
@@ -161,7 +163,9 @@ def main(config: DictConfig):
                             loss = outputs.loss
                         else:
                             raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
-                        wandb.log({f"val/{dataloader.dataset.name}/loss": loss.item()})
+                        running_loss += loss.item()
+                        iterations += 1
+                wandb.log({f"val/{dataloader.dataset.name}/loss": running_loss / iterations})
             model.train()
 
         current_step += 1
