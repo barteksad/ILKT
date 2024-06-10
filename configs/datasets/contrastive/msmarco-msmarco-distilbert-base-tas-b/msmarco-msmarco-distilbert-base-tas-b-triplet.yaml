@@ -1,7 +1,7 @@
 _target_: dataset.TripletDataset
 name: "sentence-transformers/msmarco-msmarco-distilbert-base-tas-b"
 split: "train"
-n_examples: 100000 # either a float between 0 and 1 or an integer
+n_examples: ${exp.n_examples}
 max_length: ${exp.max_length}
 batch_size: ${exp.batch_size}
 loss_fn:

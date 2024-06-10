@@ -1,8 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, List
 import torch
 from torch.utils.data import DataLoader, Dataset
-from transformers import DataCollatorForLanguageModeling, PreTrainedTokenizer
+from transformers import (
+    DataCollatorForLanguageModeling,
+    PreTrainedTokenizer,
+    DataCollatorWithPadding,
+)
 
 
 class TextDataset(ABC, Dataset):
@@ -28,7 +32,7 @@ class TextDataset(ABC, Dataset):
             batch_size=self.batch_size,
             num_workers=1,
             pin_memory=True,
-            shuffle=True,
+            shuffle=False,
         )
 
 
@@ -86,3 +90,23 @@ class MLMDataset(TextDataset):
             pad_to_multiple_of=16,
         )
         return data_collator
+
+
+class ClassificationDataset(TextDataset):
+
+    def __init__(
+        self,
+        name: str,
+        tokenizer: PreTrainedTokenizer,
+        batch_size: int,
+        n_classes: int,
+        sentence_keys: List[str],
+        label_key: str,
+    ):
+        super().__init__(name, tokenizer, batch_size)
+        self.n_classes = n_classes
+        self.sentence_keys = sentence_keys
+        self.label_key = label_key
+
+    def get_data_collator(self):
+        return DataCollatorWithPadding(tokenizer=self.tokenizer, pad_to_multiple_of=16)

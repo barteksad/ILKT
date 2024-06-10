@@ -7,13 +7,17 @@ from transformers.modeling_outputs import (
     BaseModelOutputWithPooling,
     MaskedLMOutput,
     BaseModelOutput,
+    SequenceClassifierOutput,
 )
 
 from .config import ILKTConfig
 
 
-class SentenceEmbeddingHead(nn.Module):
+def cls_pooling(last_hidden_state, attention_mask):
+    return last_hidden_state[:, 0, :]
 
+
+class SentenceEmbeddingHead(nn.Module):
     def __init__(
         self, backbone_hidden_size: int, embedding_head_config: Dict[str, Any]
     ):
@@ -21,16 +25,41 @@ class SentenceEmbeddingHead(nn.Module):
         self.config = embedding_head_config
 
     def forward(
-        self, backbone_output: BaseModelOutput, **kwargs
+        self, backbone_output: BaseModelOutput, attention_mask: torch.Tensor, **kwargs
     ) -> BaseModelOutputWithPooling:
-        embeddings = backbone_output.last_hidden_state[:, 0, :]  # type: ignore
+        if self.config["pool_type"] == "cls":
+            embeddings = cls_pooling(backbone_output.last_hidden_state, attention_mask)
+        else:
+            raise NotImplementedError(
+                f"Pooling type {self.config['pool_type']} not implemented"
+            )
         if self.config["normalize_embeddings"]:
             embeddings = nn.functional.normalize(embeddings, p=2, dim=-1)
-        return BaseModelOutputWithPooling(pooler_output=embeddings) # type: ignore
+        return BaseModelOutputWithPooling(pooler_output=embeddings)  # type: ignore
+
+
+def create_head_blocks(
+    hidden_size: int,
+    n_dense: int,
+    use_batch_norm: bool,
+    use_layer_norm: bool,
+    dropout: float,
+    **kwargs,
+) -> nn.Module:
+    blocks = []
+    for _ in range(n_dense):
+        blocks.append(nn.Linear(hidden_size, hidden_size))
+        if use_batch_norm:
+            blocks.append(nn.BatchNorm1d(hidden_size))
+        elif use_layer_norm:
+            blocks.append(nn.LayerNorm(hidden_size))
+        blocks.append(nn.ReLU())
+        if dropout > 0:
+            blocks.append(nn.Dropout(dropout))
+    return nn.Sequential(*blocks)
 
 
 class MLMHead(nn.Module):
-
     def __init__(
         self,
         backbone_hidden_size: int,
@@ -38,12 +67,19 @@ class MLMHead(nn.Module):
         mlm_head_config: Dict[str, Any],
     ):
         super().__init__()
+        self.config = mlm_head_config
 
-        self.head = nn.Linear(backbone_hidden_size, vocab_size)
+        self.head = nn.Sequential(
+            *[
+                create_head_blocks(backbone_hidden_size, **mlm_head_config),
+                nn.Linear(backbone_hidden_size, vocab_size),
+            ]
+        )
 
     def forward(
         self,
         backbone_output: BaseModelOutput,
+        attention_mask: torch.Tensor,
         labels: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> MaskedLMOutput:
@@ -57,6 +93,50 @@ class MLMHead(nn.Module):
                 labels.view(-1),
             )
         return MaskedLMOutput(loss=loss)
+
+
+class CLSHead(nn.Module):
+
+    def __init__(
+        self,
+        backbone_hidden_size: int,
+        n_classes: int,
+        cls_head_config: Dict[str, Any],
+    ):
+        super().__init__()
+        self.config = cls_head_config
+
+        self.head = nn.Sequential(
+            *[
+                create_head_blocks(backbone_hidden_size, **cls_head_config),
+                nn.Linear(backbone_hidden_size, n_classes),
+            ]
+        )
+
+    def forward(
+        self,
+        backbone_output: BaseModelOutput,
+        attention_mask: torch.Tensor,
+        labels: Optional[torch.Tensor] = None,
+        **kwargs,
+    ) -> SequenceClassifierOutput:
+        if self.config["pool_type"] == "cls":
+            embeddings = cls_pooling(backbone_output.last_hidden_state, attention_mask)
+        else:
+            raise NotImplementedError(
+                f"Pooling type {self.config['pool_type']} not implemented"
+            )
+
+        prediction_scores = self.head(embeddings)
+
+        loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(
+                prediction_scores.view(-1, prediction_scores.size(-1)),
+                labels.view(-1),
+            )
+        return SequenceClassifierOutput(loss=loss)
 
 
 class ILKTModel(PreTrainedModel):
@@ -82,6 +162,20 @@ class ILKTModel(PreTrainedModel):
             backbone_hidden_size, backbone_vocab_size, config.mlm_head_config
         )
 
+        self.cls_heads = nn.ModuleDict(
+            dict(
+                [
+                    (
+                        name,
+                        CLSHead(
+                            backbone_hidden_size, n_classes, config.cls_head_config
+                        ),
+                    )
+                    for n_classes, name in config.cls_heads
+                ]
+            )
+        )
+
     def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, **kwargs):
         return self.get_sentence_embedding(input_ids, attention_mask, **kwargs)
 
@@ -92,7 +186,9 @@ class ILKTModel(PreTrainedModel):
             input_ids=input_ids, attention_mask=attention_mask, **kwargs
         )
 
-        embedding_output = self.embedding_head(backbone_output, **kwargs)
+        embedding_output = self.embedding_head(
+            backbone_output, attention_mask, **kwargs
+        )
 
         return embedding_output
 
@@ -107,6 +203,27 @@ class ILKTModel(PreTrainedModel):
             input_ids=input_ids, attention_mask=attention_mask, **kwargs
         )
 
-        mlm_output = self.mlm_head(backbone_output, labels, **kwargs)
+        mlm_output = self.mlm_head(backbone_output, attention_mask, labels, **kwargs)
 
         return mlm_output
+
+    def get_cls_output(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        head_name: str,
+        labels: Optional[torch.Tensor] = None,
+        **kwargs,
+    ):
+        backbone_output: BaseModelOutput = self.backbone(
+            input_ids=input_ids, attention_mask=attention_mask, **kwargs
+        )
+
+        if head_name not in self.cls_heads:
+            raise ValueError(f"Head {head_name} not found in model")
+
+        cls_output = self.cls_heads[head_name](
+            backbone_output, attention_mask, labels, **kwargs
+        )
+
+        return cls_output

@@ -6,13 +6,15 @@ from typing import Any, Dict
 from .base import ContrastiveDataset
 
 torch.bfloat16
+
+
 class PairScoreDataset(ContrastiveDataset):
 
     def __init__(
         self,
         name: str,
         split: str,
-        use_rows: int | float,
+        n_examples: int,
         tokenizer: PreTrainedTokenizer,
         batch_size: int,
         max_length: int,
@@ -21,19 +23,24 @@ class PairScoreDataset(ContrastiveDataset):
     ):
         super().__init__(name, tokenizer, batch_size)
 
-        self.dataset = load_dataset(name, "pair-score", split=split)
-        if isinstance(use_rows, float):
-            use_rows = int(use_rows * len(self.dataset))  # type: ignore
+        self.dataset = load_dataset(name, "pair-score", split=split, streaming=True)
         self.dataset = self.dataset.shuffle(seed=42)  # type: ignore
-        self.dataset = self.dataset.select(range(use_rows))  # type: ignore
+        self.n_examples = n_examples
         self.max_length = max_length
         self.loss_fn = loss_fn
 
+    def reset(self):
+        self.dataset = self.dataset.shuffle()
+        self.ds_iter = iter(self.dataset)
+
     def __len__(self) -> int:
-        return len(self.dataset)  # type: ignore
+        return self.n_examples
 
     def __getitem__(self, idx: int):
-        row = self.dataset[idx]  # type: ignore
+        if idx == 0:
+            self.reset()
+
+        row = next(self.ds_iter)
 
         sentence1 = self.tokenizer(
             row["sentence1"], truncation=True, max_length=self.max_length

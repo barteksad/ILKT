@@ -11,7 +11,7 @@ from omegaconf import DictConfig
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
 import utils
-from dataset import ContrastiveDataset, MLMDataset
+from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
 from train_util import create_optimizer_v2
 
 log = logging.getLogger(__name__)
@@ -39,12 +39,16 @@ def instantiate_datasets(
         for mlm_dataset_config in config.datasets.mlm.values():
             mlm_dataset = instantiate(mlm_dataset_config, tokenizer=tokenizer)
             datasets.append(mlm_dataset)
+
+    if config.datasets.sentence_classification is not None:
+        for cls_dataset_config in config.datasets.sentence_classification.values():
+            cls_dataset = instantiate(cls_dataset_config, tokenizer=tokenizer)
+            datasets.append(cls_dataset)
     return datasets
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")
 def main(config: DictConfig):
-
     utils.preprocess_config(config)
     utils.setup_wandb(config)
     output_dir = utils.extract_output_dir(config)
@@ -57,6 +61,12 @@ def main(config: DictConfig):
         fabric.setup_dataloaders(dataset.get_dataloader()) for dataset in datasets
     ]
 
+    cls_heads = []
+    for dataset in datasets:
+        if isinstance(dataset, SentenceClassificationDataset):
+            cls_heads.append((dataset.n_classes, dataset.name))
+
+    config.model.config["cls_heads"] = cls_heads
     model = instantiate(config.model)
     optimizer = create_optimizer_v2(model, **config.exp.optimizer)
     model, optimizer = fabric.setup(model, optimizer)
@@ -78,14 +88,23 @@ def main(config: DictConfig):
 
             if isinstance(dataset, ContrastiveDataset):
                 model_outputs = (
-                    model.get_sentence_embedding(**inp).pooler_output for inp in batch["model_inputs"]  # type: ignore
+                    model.get_sentence_embedding(**inp).pooler_output
+                    for inp in batch["model_inputs"]  # type: ignore
                 )
                 loss = dataset.get_loss(
-                    {"model_outputs": model_outputs, "labels": batch["labels"] if "labels" in batch else None}  # type: ignore
+                    {
+                        "model_outputs": model_outputs,
+                        "labels": batch["labels"] if "labels" in batch else None,  # type: ignore
+                    }
                 )
-            else:
+            elif isinstance(dataset, SentenceClassificationDataset):
+                outputs = model.get_cls_output(**batch, head_name=dataset.name)
+                loss = outputs.loss
+            elif isinstance(dataset, MLMDataset):
                 outputs = model.get_mlm_output(**batch)
                 loss = outputs.loss
+            else:
+                raise ValueError(f"Unknown dataset type {type(dataset)}")
 
             wandb.log({f"train/{dataset.name}/loss": loss.item()})
 

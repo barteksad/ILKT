@@ -29,6 +29,7 @@ class TripletDataset(ContrastiveDataset):
         self.loss_fn = loss_fn
 
     def reset(self):
+        self.dataset = self.dataset.shuffle()
         self.ds_iter = iter(self.dataset)
 
     def __len__(self) -> int:

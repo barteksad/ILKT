@@ -7,6 +7,9 @@ defaults:
     - contrastive/all-nli/all-nli-pair-score.yaml
     - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
     - mlm/wikipedia/wikipedia.yaml
+    - sentence_classification/klej-cdsc-e/klej-cdsc-e.yaml
+    - sentence_classification/ klej-psc/klej-psc.yaml
+    - sentence_classification/klej-dyk/klej-dyk.yaml
 
 exp:
   log_dir: # set during runtime to automatically created dir
@@ -14,7 +17,8 @@ exp:
   max_length: 128
   batch_size: 4
   seed: 42
-  training_steps: 10
+  training_steps: 1000
+  n_examples: 1000
   optimizer:
     opt: "adamw"
     lr: 5e-5
