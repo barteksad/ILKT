@@ -17,7 +17,7 @@ exp:
   max_length: 128
   batch_size: 4
   seed: 42
-  training_steps: 1000
+  training_steps: 10
   n_examples: 1000
   optimizer:
     opt: "adamw"
