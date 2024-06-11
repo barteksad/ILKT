@@ -6,16 +6,6 @@ defaults:
   - train_datasets:
     - contrastive/all-nli/all-nli-pair-score.yaml
     - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
-#    - mlm/wikipedia/wikipedia.yaml
-    - sentence_classification/klej-cdsc-e/klej-cdsc-e.yaml
-    - sentence_classification/klej-psc/klej-psc.yaml
-    - sentence_classification/klej-dyk/klej-dyk.yaml
-
-  - val_datasets:
-      - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
-      - sentence_classification/klej-psc/klej-psc_valid.yaml
-      - sentence_classification/klej-dyk/klej-dyk_valid.yaml
-
 exp:
   log_dir: # set during runtime to automatically created dir
   pretrained_model_name_or_path: microsoft/mdeberta-v3-base

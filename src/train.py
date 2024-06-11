@@ -43,14 +43,19 @@ def instantiate_datasets(
     config: DictConfig, tokenizer: PreTrainedTokenizer, dataset_type: str
 ) -> List[ContrastiveDataset | MLMDataset]:
     datasets = []
+
     if dataset_type == "train":
+        if 'train_datasets' not in config:
+            return []
         config_datasets = config.train_datasets
     elif dataset_type == "val":
+        if 'val_datasets' not in config:
+            return []
         config_datasets = config.val_datasets
     else:
         raise ValueError(f"Unknown dataset type {dataset_type}")
 
-    if "contrastive" in config_datasets is not None:
+    if "contrastive" in config_datasets:
         for contrastive_dataset_config in config_datasets.contrastive.values():
             contrastive_dataset = instantiate(
                 contrastive_dataset_config, tokenizer=tokenizer
@@ -80,9 +85,11 @@ def prepare_dataloaders(
     val_dataloaders = []
     for dataset in val_datasets:
         val_dataloaders.append(dataset.get_dataloader())
-    return fabric.setup_dataloaders(*train_dataloaders), fabric.setup_dataloaders(
-        *val_dataloaders
-    )
+
+    train_dataloaders = fabric.setup_dataloaders(*train_dataloaders)
+    val_dataloaders = fabric.setup_dataloaders(*val_dataloaders) if len(val_dataloaders) > 0 else []
+
+    return train_dataloaders, val_dataloaders
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")

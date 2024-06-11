@@ -27,4 +27,4 @@ huggingface-cli login --token $HF_TOKEN
 wandb online
 export HYDRA_FULL_ERROR=1
 
-srun python src/train.py --config-name train_config
+srun python src/train.py --config-name train_config_contrastive_only
