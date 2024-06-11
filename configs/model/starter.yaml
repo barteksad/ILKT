@@ -4,6 +4,7 @@ config:
   backbone_config:
     pretrained_model_name_or_path: ${exp.pretrained_model_name_or_path}
     trust_remote_code: true
+    torch_dtype: torch.bfloat16
   embedding_head_config:
     pool_type: "cls"
     normalize_embeddings: true

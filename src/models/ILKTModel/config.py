@@ -16,11 +16,10 @@ class ILKTConfig(PretrainedConfig):
         cls_heads: List[Tuple[int, str]] = [],
         **kwargs
     ):
-
-        self.backbone_config = dict(**backbone_config)
-        self.embedding_head_config = dict(**embedding_head_config)
-        self.mlm_head_config = dict(**mlm_head_config)
-        self.cls_head_config = dict(**cls_head_config)
+        self.backbone_config = backbone_config
+        self.embedding_head_config = embedding_head_config
+        self.mlm_head_config = mlm_head_config
+        self.cls_head_config = cls_head_config
         self.cls_heads = cls_heads
 
         super().__init__(**kwargs)

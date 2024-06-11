@@ -8,27 +8,39 @@ import torch
 from tqdm.auto import tqdm
 from hydra.utils import instantiate
 from lightning import Fabric
-from omegaconf import DictConfig
+from omegaconf import OmegaConf, DictConfig
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
-import utils
+from utils import (
+    extract_output_dir,
+    preprocess_config,
+    setup_wandb
+)
+from train_util import (
+    TrainBatchProcessStrategy,
+    ValidationBatchProcessStrategy,
+)
+
 from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
 from train_util import create_optimizer_v2
 
 log = logging.getLogger(__name__)
 
-torch.set_float32_matmul_precision('high')
+torch.set_float32_matmul_precision("high")
 
 
 def get_fabric(config) -> Fabric:
-    fabric = instantiate(config.fabric)
+    if torch.cuda.is_bf16_supported():
+        fabric = instantiate(config.fabric, precision="bf16-mixed")
+    else:
+        fabric = instantiate(config.fabric)
     fabric.seed_everything(config.exp.seed)
     fabric.launch()
     return fabric
 
 
 def instantiate_datasets(
-        config: DictConfig, tokenizer: PreTrainedTokenizer, dataset_type: str
+    config: DictConfig, tokenizer: PreTrainedTokenizer, dataset_type: str
 ) -> List[ContrastiveDataset | MLMDataset]:
     datasets = []
     if dataset_type == "train":
@@ -38,26 +50,28 @@ def instantiate_datasets(
     else:
         raise ValueError(f"Unknown dataset type {dataset_type}")
 
-    if 'contrastive' in config_datasets is not None:
+    if "contrastive" in config_datasets is not None:
         for contrastive_dataset_config in config_datasets.contrastive.values():
             contrastive_dataset = instantiate(
                 contrastive_dataset_config, tokenizer=tokenizer
             )
             datasets.append(contrastive_dataset)
 
-    if 'mlm' in config_datasets:
+    if "mlm" in config_datasets:
         for mlm_dataset_config in config_datasets.mlm.values():
             mlm_dataset = instantiate(mlm_dataset_config, tokenizer=tokenizer)
             datasets.append(mlm_dataset)
 
-    if 'sentence_classification' in config_datasets is not None:
+    if "sentence_classification" in config_datasets is not None:
         for cls_dataset_config in config_datasets.sentence_classification.values():
             cls_dataset = instantiate(cls_dataset_config, tokenizer=tokenizer)
             datasets.append(cls_dataset)
     return datasets
 
 
-def prepare_dataloaders(fabric: Fabric, config: DictConfig, tokenizer: PreTrainedTokenizer):
+def prepare_dataloaders(
+    fabric: Fabric, config: DictConfig, tokenizer: PreTrainedTokenizer
+):
     train_dataloaders = []
     train_datasets = instantiate_datasets(config, tokenizer, "train")
     val_datasets = instantiate_datasets(config, tokenizer, "val")
@@ -66,14 +80,16 @@ def prepare_dataloaders(fabric: Fabric, config: DictConfig, tokenizer: PreTraine
     val_dataloaders = []
     for dataset in val_datasets:
         val_dataloaders.append(dataset.get_dataloader())
-    return fabric.setup_dataloaders(*train_dataloaders), fabric.setup_dataloaders(*val_dataloaders)
+    return fabric.setup_dataloaders(*train_dataloaders), fabric.setup_dataloaders(
+        *val_dataloaders
+    )
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")
 def main(config: DictConfig):
-    utils.preprocess_config(config)
-    utils.setup_wandb(config)
-    output_dir = utils.extract_output_dir(config)
+    preprocess_config(config)
+    setup_wandb(config)
+    output_dir = extract_output_dir(config)
 
     fabric = get_fabric(config)
 
@@ -88,7 +104,7 @@ def main(config: DictConfig):
             cls_heads.append((dataloader.dataset.n_classes, dataloader.dataset.name))
 
     config.model.config["cls_heads"] = cls_heads
-    model = instantiate(config.model)
+    model = instantiate(config.model, _convert_="all")
     optimizer = create_optimizer_v2(model, **config.exp.optimizer)
     model, optimizer = fabric.setup(model, optimizer)
 
@@ -97,77 +113,42 @@ def main(config: DictConfig):
     current_step = 0
     iter_train_dataloaders = [iter(dataloader) for dataloader in train_dataloaders]
 
-    pbar = tqdm(total=TRAINING_STEPS)
+    train_batch_processor = TrainBatchProcessStrategy(model)
+    train_batch_processor.on_start()
+    val_batch_processor = ValidationBatchProcessStrategy(model)
+
+    pbar = tqdm(total=TRAINING_STEPS,position=0, leave=True)
     while current_step < TRAINING_STEPS:
+        # ----------------- training -----------------
+        model.train()
         optimizer.zero_grad()
         for idx, dataloader in enumerate(train_dataloaders):
-
             try:
                 batch = next(iter_train_dataloaders[idx])  # type: ignore
             except StopIteration:
                 iter_train_dataloaders[idx] = iter(train_dataloaders[idx])  # type: ignore
                 batch = next(iter_train_dataloaders[idx])  # type: ignore
 
-            # TODO Bartek: tu by pewnie elegancko coś na wzór visitora wleciało
-            if isinstance(dataloader.dataset, ContrastiveDataset):
-                model_outputs = (
-                    model.get_sentence_embedding(**inp).pooler_output
-                    for inp in batch["model_inputs"]  # type: ignore
-                )
-                loss = dataloader.dataset.get_loss(
-                    {
-                        "model_outputs": model_outputs,
-                        "labels": batch["labels"] if "labels" in batch else None,  # type: ignore
-                    }
-                )
-            elif isinstance(dataloader.dataset, SentenceClassificationDataset):
-                outputs = model.get_cls_output(**batch, head_name=dataloader.dataset.name)
-                loss = outputs.loss
-            elif isinstance(dataloader.dataset, MLMDataset):
-                outputs = model.get_mlm_output(**batch)
-                loss = outputs.loss
-            else:
-                raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
-
-            wandb.log({f"train/{dataloader.dataset.name}/loss": loss.item()})
-
+            train_batch_output = train_batch_processor(batch, dataloader)
+            loss = train_batch_output.loss
             fabric.backward(loss)
 
         optimizer.step()
 
         # ----------------- validation -----------------
-        if current_step % config.exp.validate_every == 0:
+        if (current_step + 1) % config.exp.validate_every == 0:
+            train_batch_processor.on_end()
+            val_batch_processor.on_start()
             model.eval()
             for idx, dataloader in enumerate(val_dataloaders):
-                running_loss = 0
-                iterations = 0
-                for batch in dataloader:
-                    with torch.no_grad():
-                        # tutaj wiadomo to jest do posprzątania
-                        if isinstance(dataloader.dataset, ContrastiveDataset):
-                            model_outputs = (
-                                model.get_sentence_embedding(**inp).pooler_output
-                                for inp in batch["model_inputs"]  # type: ignore
-                            )
-                            loss = dataloader.dataset.get_loss(
-                                {
-                                    "model_outputs": model_outputs,
-                                    "labels": batch["labels"] if "labels" in batch else None,  # type: ignore
-                                }
-                            )
-                        elif isinstance(dataloader.dataset, SentenceClassificationDataset):
-                            outputs = model.get_cls_output(**batch, head_name=dataloader.dataset.name)
-                            loss = outputs.loss
-                        elif isinstance(dataloader.dataset, MLMDataset):
-                            outputs = model.get_mlm_output(**batch)
-                            loss = outputs.loss
-                        else:
-                            raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
-                        running_loss += loss.item()
-                        iterations += 1
-                wandb.log({f"val/{dataloader.dataset.name}/loss": running_loss / iterations})
-            model.train()
 
+                for batch in dataloader:
+                    with torch.inference_mode():
+                        _ = val_batch_processor(batch, dataloader)
+
+            val_batch_processor.on_end()
+            train_batch_processor.on_start()
+            
         current_step += 1
         pbar.update(1)
 

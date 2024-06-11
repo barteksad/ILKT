@@ -34,13 +34,19 @@ huggingface-cli login
 
 to submit a training job:
 ```
-sbatch slurm/run_train.sh
+sbatch slurm/entropy/run_train.sh
 ```
+
+on entropy Titan-V
+```
+precision: "bf16-mixed"
+```
+won't work, it should be removed
 
 to submit a benchmark job:
 First specify the model path in benchmarks/pl-mteb/configs/transformer_embeddings.json
 ```
-sbatch slurm/run_pl_mteb.sh
+sbatch slurm/entropy/run_pl_mteb.sh
 ```
 
 Datasets types follows the one availabe [here](https://huggingface.co/datasets/sentence-transformers/embedding-training-data)
