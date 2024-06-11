@@ -3,26 +3,27 @@ import os
 from typing import List
 
 import hydra
-import wandb
 import torch
 from tqdm.auto import tqdm
 from hydra.utils import instantiate
 from lightning import Fabric
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
+from src.train_utils.data_iterator import SingleBatchPerDatasetIterator, FullValidIterator
+from src.train_utils.dataset_loader import DatasetLoader
 from utils import (
     extract_output_dir,
     preprocess_config,
     setup_wandb
 )
-from train_util import (
+from src.train_utils.train_util import (
     TrainBatchProcessStrategy,
     ValidationBatchProcessStrategy,
 )
 
 from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
-from train_util import create_optimizer_v2
+from src.train_utils.train_util import create_optimizer_v2
 
 log = logging.getLogger(__name__)
 
@@ -39,52 +40,6 @@ def get_fabric(config) -> Fabric:
     return fabric
 
 
-def instantiate_datasets(
-    config: DictConfig, tokenizer: PreTrainedTokenizer, dataset_type: str
-) -> List[ContrastiveDataset | MLMDataset]:
-    datasets = []
-    if dataset_type == "train":
-        config_datasets = config.train_datasets
-    elif dataset_type == "val":
-        config_datasets = config.val_datasets
-    else:
-        raise ValueError(f"Unknown dataset type {dataset_type}")
-
-    if "contrastive" in config_datasets is not None:
-        for contrastive_dataset_config in config_datasets.contrastive.values():
-            contrastive_dataset = instantiate(
-                contrastive_dataset_config, tokenizer=tokenizer
-            )
-            datasets.append(contrastive_dataset)
-
-    if "mlm" in config_datasets:
-        for mlm_dataset_config in config_datasets.mlm.values():
-            mlm_dataset = instantiate(mlm_dataset_config, tokenizer=tokenizer)
-            datasets.append(mlm_dataset)
-
-    if "sentence_classification" in config_datasets is not None:
-        for cls_dataset_config in config_datasets.sentence_classification.values():
-            cls_dataset = instantiate(cls_dataset_config, tokenizer=tokenizer)
-            datasets.append(cls_dataset)
-    return datasets
-
-
-def prepare_dataloaders(
-    fabric: Fabric, config: DictConfig, tokenizer: PreTrainedTokenizer
-):
-    train_dataloaders = []
-    train_datasets = instantiate_datasets(config, tokenizer, "train")
-    val_datasets = instantiate_datasets(config, tokenizer, "val")
-    for dataset in train_datasets:
-        train_dataloaders.append(dataset.get_dataloader())
-    val_dataloaders = []
-    for dataset in val_datasets:
-        val_dataloaders.append(dataset.get_dataloader())
-    return fabric.setup_dataloaders(*train_dataloaders), fabric.setup_dataloaders(
-        *val_dataloaders
-    )
-
-
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")
 def main(config: DictConfig):
     preprocess_config(config)
@@ -94,12 +49,11 @@ def main(config: DictConfig):
     fabric = get_fabric(config)
 
     tokenizer = AutoTokenizer.from_pretrained(config.exp.pretrained_model_name_or_path)
-    train_dataloaders, val_dataloaders = prepare_dataloaders(fabric, config, tokenizer)
-
+    dataset_loader = DatasetLoader(fabric, config, tokenizer)
     cls_heads = []
     # setting only for training datasets as this has to be trained, setting val dataset that was not present
     # in train will raise error
-    for dataloader in train_dataloaders:
+    for dataloader in dataset_loader.train_dataloaders:
         if isinstance(dataloader.dataset, SentenceClassificationDataset):
             cls_heads.append((dataloader.dataset.n_classes, dataloader.dataset.name))
 
@@ -111,24 +65,20 @@ def main(config: DictConfig):
     TRAINING_STEPS = config.exp.training_steps
 
     current_step = 0
-    iter_train_dataloaders = [iter(dataloader) for dataloader in train_dataloaders]
 
     train_batch_processor = TrainBatchProcessStrategy(model)
     train_batch_processor.on_start()
     val_batch_processor = ValidationBatchProcessStrategy(model)
 
-    pbar = tqdm(total=TRAINING_STEPS,position=0, leave=True)
+    train_iterator = SingleBatchPerDatasetIterator(dataset_loader.train_dataloaders)
+    valid_iterator = FullValidIterator(dataset_loader.val_dataloaders)
+
+    pbar = tqdm(total=TRAINING_STEPS, position=0, leave=True)
     while current_step < TRAINING_STEPS:
         # ----------------- training -----------------
         model.train()
         optimizer.zero_grad()
-        for idx, dataloader in enumerate(train_dataloaders):
-            try:
-                batch = next(iter_train_dataloaders[idx])  # type: ignore
-            except StopIteration:
-                iter_train_dataloaders[idx] = iter(train_dataloaders[idx])  # type: ignore
-                batch = next(iter_train_dataloaders[idx])  # type: ignore
-
+        for batch, dataloader in train_iterator:
             train_batch_output = train_batch_processor(batch, dataloader)
             loss = train_batch_output.loss
             fabric.backward(loss)
@@ -140,15 +90,13 @@ def main(config: DictConfig):
             train_batch_processor.on_end()
             val_batch_processor.on_start()
             model.eval()
-            for idx, dataloader in enumerate(val_dataloaders):
-
-                for batch in dataloader:
-                    with torch.inference_mode():
-                        _ = val_batch_processor(batch, dataloader)
+            for batch, dataloader in valid_iterator:
+                with torch.inference_mode():
+                    _ = val_batch_processor(batch, dataloader)
 
             val_batch_processor.on_end()
             train_batch_processor.on_start()
-            
+
         current_step += 1
         pbar.update(1)
 
