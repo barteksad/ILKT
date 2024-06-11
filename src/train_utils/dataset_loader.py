@@ -1,6 +1,6 @@
 from typing import List, TypeVar
 
-from src.dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
+from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
 from hydra.utils import instantiate
 from lightning import Fabric
 from omegaconf import DictConfig

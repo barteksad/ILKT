@@ -10,20 +10,20 @@ from lightning import Fabric
 from omegaconf import DictConfig
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
-from src.train_utils.data_iterator import SingleBatchPerDatasetIterator, FullValidIterator
-from src.train_utils.dataset_loader import DatasetLoader
+from train_utils.data_iterator import SingleBatchPerDatasetIterator, FullValidIterator
+from train_utils.dataset_loader import DatasetLoader
 from utils import (
     extract_output_dir,
     preprocess_config,
     setup_wandb
 )
-from src.train_utils.train_util import (
+from train_utils.train_util import (
     TrainBatchProcessStrategy,
     ValidationBatchProcessStrategy,
 )
 
 from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
-from src.train_utils.train_util import create_optimizer_v2
+from train_utils.train_util import create_optimizer_v2
 
 log = logging.getLogger(__name__)
 

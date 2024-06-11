@@ -1,6 +1,6 @@
 from typing import List, Iterable
 
-from src.train_utils.train_util import DL_TYPE
+from train_utils.train_util import DL_TYPE
 
 
 class DataIterator(Iterable):
