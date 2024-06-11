@@ -1,0 +1,15 @@
+_target_: dataset.SentenceClassificationDataset
+name: "allegro/klej-cdsc-e"
+split: "validation"
+n_classes: 3
+n_examples: ${exp.n_examples_valid}
+max_length: ${exp.max_length}
+batch_size: ${exp.batch_size}
+sentence_keys: 
+  - "sentence_A"
+  - "sentence_B"
+label_key: "entailment_judgment"
+label_mapping: 
+  "NEUTRAL": 0
+  "ENTAILMENT": 1
+  "CONTRADICTION": 2
