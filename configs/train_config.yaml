@@ -18,13 +18,13 @@ defaults:
 
 exp:
   log_dir: # set during runtime to automatically created dir
-  pretrained_model_name_or_path: "microsoft/mdeberta-v3-base"
-  max_length: 128
-  batch_size: 4
+  pretrained_model_name_or_path: microsoft/mdeberta-v3-base
+  max_length: 512
+  batch_size: 8
   seed: 42
-  training_steps: 1000
-  n_examples: 1000
-  n_examples_valid: 100
+  training_steps: 20
+  n_examples: 10
+  n_examples_valid: 10
   validate_every: 10
   optimizer:
     opt: "adamw"

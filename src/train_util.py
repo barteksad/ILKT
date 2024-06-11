@@ -1,9 +1,183 @@
-from typing import Callable, Optional
+from abc import abstractmethod
+from collections import defaultdict
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, TypeVar
 
+import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader
+
+import wandb
+
+from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
+from models import ILKTModel
 
 __all__ = ["create_optimizer_v2"]
+
+DL_TYPE = TypeVar(
+    "DL_TYPE",
+    DataLoader[ContrastiveDataset],
+    DataLoader[MLMDataset],
+    DataLoader[SentenceClassificationDataset],
+)
+
+
+# here we combine API for models and datasets, this is the only place where we need to know model and dataset spec
+class BatchProcessor:
+    def on_start(self):
+        pass
+
+    def on_end(self):
+        pass
+
+    @abstractmethod
+    def on_batch(
+        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+    ) -> Dict[str, Any]:
+        pass
+
+
+class ModelOutputProcessor(BatchProcessor):
+    def on_batch(
+        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+    ) -> Dict[str, Any]:
+        if isinstance(dataloader.dataset, ContrastiveDataset):
+            model_outputs = (
+                model.get_sentence_embedding(**inp).pooler_output
+                for inp in batch["model_inputs"]  # type: ignore
+            )
+        elif isinstance(dataloader.dataset, SentenceClassificationDataset):
+            model_outputs = model.get_cls_output(
+                **batch, head_name=dataloader.dataset.name
+            )
+        elif isinstance(dataloader.dataset, MLMDataset):
+            model_outputs = model.get_mlm_output(**batch)
+        else:
+            raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
+
+        return {
+            "model_outputs": model_outputs,
+            "labels": batch["labels"] if "labels" in batch else None,  # type: ignore
+        }
+
+
+class LossProcessor(BatchProcessor):
+    def on_batch(
+        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+    ) -> Dict[str, Any]:
+        if isinstance(dataloader.dataset, ContrastiveDataset):
+            loss = dataloader.dataset.get_loss(batch)
+        elif isinstance(
+            dataloader.dataset, (MLMDataset, SentenceClassificationDataset)
+        ):
+            loss = batch["model_outputs"].loss
+        else:
+                raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
+        return {"loss": loss}
+
+
+class MetricProcessor(BatchProcessor):
+    def __init__(self, keys_to_track: List[str]):
+        self.keys_to_track = keys_to_track
+
+    def on_start(self):
+        self.values = defaultdict(int)
+        self.counts = defaultdict(int)
+
+    def on_batch(
+        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+    ) -> Dict[str, Any]:
+        for key in self.keys_to_track:
+            self.values[key] += batch[key].item()
+            self.counts[key] += 1
+        return {
+            **batch,
+            "agg_metrics": {
+                key: self.values[key] / self.counts[key] for key in self.keys_to_track
+            }
+        }
+
+
+class WandbMetricLogger(BatchProcessor):
+    def __init__(self, split: str, keys_to_track: List[str], log_per_batch: bool):
+        self.split = split
+        self.keys_to_track = keys_to_track
+        self.log_per_batch = log_per_batch
+
+    def log(self, name:str, key: str, value: float | torch.Tensor):
+        value_to_log = value
+        if isinstance(value, torch.Tensor):
+            value_to_log = value.item()
+        wandb.log({f"{self.split}/{name}/{key}": value_to_log})
+
+    def on_start(self):
+        self.last_batch = {}
+
+    def on_batch(
+        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+    ) -> Dict[str, Any]:
+        if self.log_per_batch:
+            for key in self.keys_to_track:
+                self.log(dataloader.dataset.name, key, batch[key])
+        else:
+            self.last_batch[dataloader.dataset.name] = batch["agg_metrics"]
+
+        return batch
+
+    def on_end(self):
+        if not self.log_per_batch:
+            for dataset_name, metrics in self.last_batch.items():
+                for key in self.keys_to_track:
+                    self.log(dataset_name, key, metrics[key])          
+
+
+BatchProcessOutput = NamedTuple("BatchProcessOutput", [("loss", torch.Tensor)])
+
+
+class BatchProcessStrategy:
+    def __init__(self, model: ILKTModel, steps: List[BatchProcessor]):
+        self.model = model
+        self.steps = steps
+
+    def on_start(self):
+        for step in self.steps:
+            step.on_start()
+
+    def on_end(self):
+        for step in self.steps:
+            step.on_end()
+
+    def __call__(
+        self, batch: Dict[str, Any], dataloader: DL_TYPE
+    ) -> BatchProcessOutput:
+        for step in self.steps:
+            batch = step.on_batch(self.model, batch, dataloader)
+        return BatchProcessOutput(loss=batch["loss"])
+
+class TrainBatchProcessStrategy(BatchProcessStrategy):
+    def __init__(
+        self, 
+        model: ILKTModel, 
+        steps = [
+            ModelOutputProcessor(),
+            LossProcessor(),
+            WandbMetricLogger("train", ["loss"], log_per_batch=True)
+        ]
+    ):
+        super().__init__(model, steps)
+
+class ValidationBatchProcessStrategy(BatchProcessStrategy):
+    def __init__(
+        self, 
+        model: ILKTModel, 
+        steps = [
+            ModelOutputProcessor(),
+            LossProcessor(),
+            MetricProcessor(["loss"]),
+            WandbMetricLogger("val", ["loss"], log_per_batch=False)
+        ]
+    ):
+        super().__init__(model, steps)
 
 """
 code taken from: https://github.com/huggingface/pytorch-image-models/blob/main/timm/optim/optim_factory.py#L194
