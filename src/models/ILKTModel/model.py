@@ -35,7 +35,10 @@ class SentenceEmbeddingHead(nn.Module):
             )
         if self.config["normalize_embeddings"]:
             embeddings = nn.functional.normalize(embeddings, p=2, dim=-1)
-        return BaseModelOutputWithPooling(pooler_output=embeddings)  # type: ignore
+        return BaseModelOutputWithPooling(
+            last_hidden_state=backbone_output.last_hidden_state,
+            pooler_output=embeddings,  # type: ignore
+        )
 
 
 def create_head_blocks(
@@ -154,6 +157,7 @@ class ILKTModel(PreTrainedModel):
         )
 
         backbone_hidden_size = backbone_config.hidden_size
+        self.config.hidden_size = backbone_hidden_size
         backbone_vocab_size = backbone_config.vocab_size
         self.embedding_head = SentenceEmbeddingHead(
             backbone_hidden_size, config.embedding_head_config
@@ -176,8 +180,16 @@ class ILKTModel(PreTrainedModel):
             )
         )
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, **kwargs):
-        return self.get_sentence_embedding(input_ids, attention_mask, **kwargs)
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        token_type_ids: Optional[torch.Tensor] = None,
+        **kwargs,
+    ):
+        return self.get_sentence_embedding(
+            input_ids, attention_mask, token_type_ids=token_type_ids
+        )
 
     def get_sentence_embedding(
         self, input_ids: torch.Tensor, attention_mask: torch.Tensor, **kwargs

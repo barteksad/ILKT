@@ -12,11 +12,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 
 from train_utils.data_iterator import SingleBatchPerDatasetIterator, FullValidIterator
 from train_utils.dataset_loader import DatasetLoader
-from utils import (
-    extract_output_dir,
-    preprocess_config,
-    setup_wandb
-)
+from utils import extract_output_dir, preprocess_config, setup_wandb
 from train_utils.train_util import (
     TrainBatchProcessStrategy,
     ValidationBatchProcessStrategy,
@@ -100,17 +96,11 @@ def main(config: DictConfig):
         current_step += 1
         pbar.update(1)
 
-    # TODO make it save properly, right now doesnt work
     model.config.register_for_auto_class()
     model.register_for_auto_class("AutoModel")
 
     model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
     tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
-
-    # WARNING if you hange this, also hange in benchmarks where we do:
-    # if name.startswith("ILKT"):
-    #             group, name = name.split("/")[-1].split("_")
-    # to distinguish between our models and others and save everything in wandb
     group, name = str(config.exp.log_dir).split("/")[-2:]
     model.push_to_hub(f"ILKT/{group}_{name}")
     tokenizer.push_to_hub(f"ILKT/{group}_{name}")

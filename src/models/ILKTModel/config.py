@@ -21,5 +21,6 @@ class ILKTConfig(PretrainedConfig):
         self.mlm_head_config = mlm_head_config
         self.cls_head_config = cls_head_config
         self.cls_heads = cls_heads
+        self.output_hidden_states = False
 
         super().__init__(**kwargs)
