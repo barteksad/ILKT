@@ -15,3 +15,4 @@ sentencepiece
 mwparserfromhell
 huggingface_cli
 pyarrow
+mteb==1.12.25

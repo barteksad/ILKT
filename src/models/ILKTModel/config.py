@@ -23,4 +23,7 @@ class ILKTConfig(PretrainedConfig):
         self.cls_heads = cls_heads
         self.output_hidden_states = False
 
+        # TODO:
+        # make config a proper HF config, save max length ets, don't know how it works exactly in hf ecosystem
+
         super().__init__(**kwargs)

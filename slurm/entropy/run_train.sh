@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --partition common
-#SBATCH --qos=1gpu4h
+#SBATCH --qos=1gpu1d
 #SBATCH --gres=gpu:1
 #SBATCH --time 4:00:00
 #SBATCH --job-name=train

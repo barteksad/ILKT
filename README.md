@@ -17,7 +17,7 @@ python -m venv env
 source env/bin/activate
 pip install -r requirements.txt
 pip install scipy==1.10.1
-pip install mteb==1.12.5
+pip install mteb==1.12.25
 pip install pydantic==2.7.2
 ```
 
@@ -44,7 +44,7 @@ precision: "bf16-mixed"
 won't work, it should be removed
 
 to submit a benchmark job:
-First specify the model path in benchmarks/pl-mteb/configs/transformer_embeddings.json
+edit model name in this file and run
 ```
 sbatch slurm/entropy/run_pl_mteb.sh
 ```
