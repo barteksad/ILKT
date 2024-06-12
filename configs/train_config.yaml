@@ -23,7 +23,7 @@ exp:
   max_length: 512
   batch_size: 8
   seed: 42
-  training_steps: 20
+  training_steps: 200
   n_examples: 10
   n_examples_valid: 10
   validate_every: 10
