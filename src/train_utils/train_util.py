@@ -32,14 +32,14 @@ class BatchProcessor:
 
     @abstractmethod
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+            self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
     ) -> Dict[str, Any]:
         pass
 
 
 class ModelOutputProcessor(BatchProcessor):
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+            self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
     ) -> Dict[str, Any]:
         if isinstance(dataloader.dataset, ContrastiveDataset):
             model_outputs = (
@@ -63,16 +63,16 @@ class ModelOutputProcessor(BatchProcessor):
 
 class LossProcessor(BatchProcessor):
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+            self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
     ) -> Dict[str, Any]:
         if isinstance(dataloader.dataset, ContrastiveDataset):
             loss = dataloader.dataset.get_loss(batch)
         elif isinstance(
-            dataloader.dataset, (MLMDataset, SentenceClassificationDataset)
+                dataloader.dataset, (MLMDataset, SentenceClassificationDataset)
         ):
             loss = batch["model_outputs"].loss
         else:
-                raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
+            raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
         return {"loss": loss}
 
 
@@ -85,7 +85,7 @@ class MetricProcessor(BatchProcessor):
         self.counts = defaultdict(int)
 
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+            self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
     ) -> Dict[str, Any]:
         for key in self.keys_to_track:
             self.values[key] += batch[key].item()
@@ -104,7 +104,7 @@ class WandbMetricLogger(BatchProcessor):
         self.keys_to_track = keys_to_track
         self.log_per_batch = log_per_batch
 
-    def log(self, name:str, key: str, value: float | torch.Tensor):
+    def log(self, name: str, key: str, value: float | torch.Tensor):
         value_to_log = value
         if isinstance(value, torch.Tensor):
             value_to_log = value.item()
@@ -114,7 +114,7 @@ class WandbMetricLogger(BatchProcessor):
         self.last_batch = {}
 
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+            self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
     ) -> Dict[str, Any]:
         if self.log_per_batch:
             for key in self.keys_to_track:
@@ -128,7 +128,7 @@ class WandbMetricLogger(BatchProcessor):
         if not self.log_per_batch:
             for dataset_name, metrics in self.last_batch.items():
                 for key in self.keys_to_track:
-                    self.log(dataset_name, key, metrics[key])          
+                    self.log(dataset_name, key, metrics[key])
 
 
 BatchProcessOutput = NamedTuple("BatchProcessOutput", [("loss", torch.Tensor)])
@@ -148,36 +148,50 @@ class BatchProcessStrategy:
             step.on_end()
 
     def __call__(
-        self, batch: Dict[str, Any], dataloader: DL_TYPE
+            self, batch: Dict[str, Any], dataloader: DL_TYPE
     ) -> BatchProcessOutput:
         for step in self.steps:
             batch = step.on_batch(self.model, batch, dataloader)
         return BatchProcessOutput(loss=batch["loss"])
 
+
 class TrainBatchProcessStrategy(BatchProcessStrategy):
     def __init__(
-        self, 
-        model: ILKTModel, 
-        steps = [
-            ModelOutputProcessor(),
-            LossProcessor(),
-            WandbMetricLogger("train", ["loss"], log_per_batch=True)
-        ]
+            self,
+            model: ILKTModel,
+            steps=None
+            # steps = [
+            #     ModelOutputProcessor(),
+            #     LossProcessor(),
+            #     WandbMetricLogger("train", ["loss"], log_per_batch=True)
+            # ]
+            # TODO Bartek: Takie rozwiązanie jest trochę syfiaste bo wszsytkie strategie zrobione z domyślnym argumentm
+            #  steps będą współdzieliły tą listę (będą trzymały referencję do tej samej)
     ):
+        if steps is None:
+            steps = [
+                ModelOutputProcessor(),
+                LossProcessor(),
+                WandbMetricLogger("train", ["loss"], log_per_batch=True)
+            ]  # W ten sposób przy każdym wykonaniu kosntruktora rtobisz nowe obiekty - znacznie mniej błędogenne
         super().__init__(model, steps)
+
 
 class ValidationBatchProcessStrategy(BatchProcessStrategy):
     def __init__(
-        self, 
-        model: ILKTModel, 
-        steps = [
-            ModelOutputProcessor(),
-            LossProcessor(),
-            MetricProcessor(["loss"]),
-            WandbMetricLogger("val", ["loss"], log_per_batch=False)
-        ]
+            self,
+            model: ILKTModel,
+            steps=None,
     ):
+        if steps is None:
+            steps = [
+                ModelOutputProcessor(),
+                LossProcessor(),
+                MetricProcessor(["loss"]),
+                WandbMetricLogger("val", ["loss"], log_per_batch=False)
+            ]
         super().__init__(model, steps)
+
 
 """
 code taken from: https://github.com/huggingface/pytorch-image-models/blob/main/timm/optim/optim_factory.py#L194
@@ -185,7 +199,7 @@ code taken from: https://github.com/huggingface/pytorch-image-models/blob/main/t
 
 
 def param_groups_weight_decay(
-    model: nn.Module, weight_decay=1e-5, no_weight_decay_list=()
+        model: nn.Module, weight_decay=1e-5, no_weight_decay_list=()
 ):
     no_weight_decay_list = set(no_weight_decay_list)
     decay = []
@@ -206,15 +220,15 @@ def param_groups_weight_decay(
 
 
 def create_optimizer_v2(
-    model_or_params,
-    opt: str = "adamw",
-    lr: Optional[float] = None,
-    weight_decay: float = 0.0,
-    momentum: float = 0.9,
-    foreach: Optional[bool] = None,
-    filter_bias_and_bn: bool = True,
-    param_group_fn: Optional[Callable] = None,
-    **kwargs,
+        model_or_params,
+        opt: str = "adamw",
+        lr: Optional[float] = None,
+        weight_decay: float = 0.0,
+        momentum: float = 0.9,
+        foreach: Optional[bool] = None,
+        filter_bias_and_bn: bool = True,
+        param_group_fn: Optional[Callable] = None,
+        **kwargs,
 ):
     """Create an optimizer.
 
