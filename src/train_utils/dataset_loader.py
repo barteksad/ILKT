@@ -61,4 +61,7 @@ class DatasetLoader:
         for dataset in val_datasets:
             val_dataloaders.append(dataset.get_dataloader())
         self.train_dataloaders = self.fabric.setup_dataloaders(*train_dataloaders)
-        self.val_dataloaders = self.fabric.setup_dataloaders(*val_dataloaders)
+        if len(val_dataloaders) > 0:
+            self.val_dataloaders = self.fabric.setup_dataloaders(*val_dataloaders)
+        else:
+            self.val_dataloaders = []
