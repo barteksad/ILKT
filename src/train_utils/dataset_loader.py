@@ -26,7 +26,10 @@ class DatasetLoader:
         if dataset_type == "train":
             config_datasets = self.config.train_datasets
         elif dataset_type == "val":
-            config_datasets = self.config.val_datasets
+            if "val_datasets" in self.config:
+                config_datasets = self.config.val_datasets
+            else:
+                config_datasets = {}
         else:
             raise ValueError(f"Unknown dataset type {dataset_type}")
 
