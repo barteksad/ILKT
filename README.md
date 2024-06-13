@@ -23,6 +23,7 @@ pip install pydantic==2.7.2
 
 to configure wandb install it with pip and run
 ```
+export WANDB_API_KEY=$(cat /path/to/secure/file)
 wandb login $WANDB_API_KEY
 ```
 
