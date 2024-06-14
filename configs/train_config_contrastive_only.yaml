@@ -6,16 +6,17 @@ defaults:
   - train_datasets:
     - contrastive/all-nli/all-nli-pair-score.yaml
     - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
+
 exp:
   log_dir: # set during runtime to automatically created dir
   pretrained_model_name_or_path: microsoft/mdeberta-v3-base
   max_length: 256
-  batch_size: 8
+  batch_size: 32
   seed: 42
-  training_steps: 10010
-  n_examples: 5000
-  n_examples_valid: 1000
-  validate_every: 5000
+  training_steps: 1_000_001
+  n_examples: 100_000
+  n_examples_valid: 100_000
+  validate_every: 100_000
   optimizer:
     opt: "adamw"
     lr: 5e-5

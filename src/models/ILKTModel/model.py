@@ -9,36 +9,13 @@ from transformers.modeling_outputs import (
     BaseModelOutput,
     SequenceClassifierOutput,
 )
+from enum import Enum
 
 from .config import ILKTConfig
 
 
 def cls_pooling(last_hidden_state, attention_mask):
     return last_hidden_state[:, 0, :]
-
-
-class SentenceEmbeddingHead(nn.Module):
-    def __init__(
-        self, backbone_hidden_size: int, embedding_head_config: Dict[str, Any]
-    ):
-        super().__init__()
-        self.config = embedding_head_config
-
-    def forward(
-        self, backbone_output: BaseModelOutput, attention_mask: torch.Tensor, **kwargs
-    ) -> BaseModelOutputWithPooling:
-        if self.config["pool_type"] == "cls":
-            embeddings = cls_pooling(backbone_output.last_hidden_state, attention_mask)
-        else:
-            raise NotImplementedError(
-                f"Pooling type {self.config['pool_type']} not implemented"
-            )
-        if self.config["normalize_embeddings"]:
-            embeddings = nn.functional.normalize(embeddings, p=2, dim=-1)
-        return BaseModelOutputWithPooling(
-            last_hidden_state=backbone_output.last_hidden_state,
-            pooler_output=embeddings,  # type: ignore
-        )
 
 
 def create_head_blocks(
@@ -60,6 +37,36 @@ def create_head_blocks(
         if dropout > 0:
             blocks.append(nn.Dropout(dropout))
     return nn.Sequential(*blocks)
+
+
+class SentenceEmbeddingHead(nn.Module):
+    def __init__(
+        self, backbone_hidden_size: int, embedding_head_config: Dict[str, Any]
+    ):
+        super().__init__()
+        self.config = embedding_head_config
+
+        self.head = nn.Sequential(
+            *[
+                create_head_blocks(backbone_hidden_size, **embedding_head_config),
+            ]
+        )
+
+    def forward(
+        self, backbone_output: BaseModelOutput, attention_mask: torch.Tensor, **kwargs
+    ) -> BaseModelOutputWithPooling:
+        if self.config["pool_type"] == "cls":
+            embeddings = cls_pooling(backbone_output.last_hidden_state, attention_mask)
+        else:
+            raise NotImplementedError(
+                f"Pooling type {self.config['pool_type']} not implemented"
+            )
+        if self.config["normalize_embeddings"]:
+            embeddings = nn.functional.normalize(embeddings, p=2, dim=-1)
+        return BaseModelOutputWithPooling(
+            last_hidden_state=backbone_output.last_hidden_state,
+            pooler_output=embeddings,  # type: ignore
+        )
 
 
 class MLMHead(nn.Module):
@@ -99,7 +106,6 @@ class MLMHead(nn.Module):
 
 
 class CLSHead(nn.Module):
-
     def __init__(
         self,
         backbone_hidden_size: int,
@@ -140,6 +146,12 @@ class CLSHead(nn.Module):
                 labels.view(-1),
             )
         return SequenceClassifierOutput(loss=loss)
+
+
+class ForwardRouting(Enum):
+    GET_SENTENCE_EMBEDDING = "get_sentence_embedding"
+    GET_MLM_OUTPUT = "get_mlm_output"
+    GET_CLS_OUTPUT = "get_cls_output"
 
 
 class ILKTModel(PreTrainedModel):
@@ -185,11 +197,23 @@ class ILKTModel(PreTrainedModel):
         input_ids: torch.Tensor,
         attention_mask: torch.Tensor,
         token_type_ids: Optional[torch.Tensor] = None,
+        forward_routing: ForwardRouting = ForwardRouting.GET_SENTENCE_EMBEDDING,
         **kwargs,
     ):
-        return self.get_sentence_embedding(
-            input_ids, attention_mask, token_type_ids=token_type_ids
-        )
+        if forward_routing == ForwardRouting.GET_SENTENCE_EMBEDDING:
+            return self.get_sentence_embedding(
+                input_ids, attention_mask, token_type_ids=token_type_ids
+            )
+        elif forward_routing == ForwardRouting.GET_MLM_OUTPUT:
+            return self.get_mlm_output(
+                input_ids, attention_mask, token_type_ids=token_type_ids, **kwargs
+            )
+        elif forward_routing == ForwardRouting.GET_CLS_OUTPUT:
+            return self.get_cls_output(
+                input_ids, attention_mask, token_type_ids=token_type_ids, **kwargs
+            )
+        else:
+            raise ValueError(f"Unknown forward routing {forward_routing}")
 
     def get_sentence_embedding(
         self, input_ids: torch.Tensor, attention_mask: torch.Tensor, **kwargs

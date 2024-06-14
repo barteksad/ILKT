@@ -15,7 +15,9 @@ DS_TYPE = TypeVar(
 
 
 class DatasetLoader:
-    def __init__(self, fabric: Fabric, config: DictConfig, tokenizer: PreTrainedTokenizer):
+    def __init__(
+        self, fabric: Fabric, config: DictConfig, tokenizer: PreTrainedTokenizer
+    ):
         self.fabric = fabric
         self.config = config
         self.tokenizer = tokenizer
@@ -49,6 +51,7 @@ class DatasetLoader:
             for cls_dataset_config in config_datasets.sentence_classification.values():
                 cls_dataset = instantiate(cls_dataset_config, tokenizer=self.tokenizer)
                 datasets.append(cls_dataset)
+
         return datasets
 
     def prepare_dataloaders(self):
@@ -65,3 +68,8 @@ class DatasetLoader:
             self.val_dataloaders = self.fabric.setup_dataloaders(*val_dataloaders)
         else:
             self.val_dataloaders = []
+
+        if not isinstance(self.train_dataloaders, list):
+            self.train_dataloaders = [self.train_dataloaders]
+        if not isinstance(self.val_dataloaders, list):
+            self.val_dataloaders = [self.val_dataloaders]

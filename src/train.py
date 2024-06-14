@@ -38,11 +38,10 @@ def get_fabric(config) -> Fabric:
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")
 def main(config: DictConfig):
-    preprocess_config(config)
-    setup_wandb(config)
-    output_dir = extract_output_dir(config)
-
     fabric = get_fabric(config)
+    preprocess_config(config)
+    setup_wandb(config, fabric)
+    output_dir = extract_output_dir(config)
 
     tokenizer = AutoTokenizer.from_pretrained(config.exp.pretrained_model_name_or_path)
     dataset_loader = DatasetLoader(fabric, config, tokenizer)
@@ -58,52 +57,61 @@ def main(config: DictConfig):
     optimizer = create_optimizer_v2(model, **config.exp.optimizer)
     model, optimizer = fabric.setup(model, optimizer)
 
+    model.config.register_for_auto_class()
+    model.register_for_auto_class("AutoModel")
+
     TRAINING_STEPS = config.exp.training_steps
 
     current_step = 0
 
     train_batch_processor = TrainBatchProcessStrategy(model)
-    train_batch_processor.on_start()
+    train_batch_processor.on_start(fabric)
     val_batch_processor = ValidationBatchProcessStrategy(model)
 
     train_iterator = SingleBatchPerDatasetIterator(dataset_loader.train_dataloaders)
     valid_iterator = FullValidIterator(dataset_loader.val_dataloaders)
 
-    pbar = tqdm(total=TRAINING_STEPS, position=0, leave=True)
+    if fabric.is_global_zero:
+        pbar = tqdm(total=TRAINING_STEPS, position=0, leave=True)
     while current_step < TRAINING_STEPS:
         # ----------------- training -----------------
         model.train()
-        optimizer.zero_grad()
         for batch, dataloader in train_iterator:
-            train_batch_output = train_batch_processor(batch, dataloader)
+            optimizer.zero_grad()
+            train_batch_output = train_batch_processor(batch, dataloader, fabric)
             loss = train_batch_output.loss
             fabric.backward(loss)
-
-        optimizer.step()
+            optimizer.step()
 
         # ----------------- validation -----------------
         if (current_step + 1) % config.exp.validate_every == 0:
-            train_batch_processor.on_end()
-            val_batch_processor.on_start()
+            train_batch_processor.on_end(fabric)
+            val_batch_processor.on_start(fabric)
             model.eval()
             for batch, dataloader in valid_iterator:
                 with torch.inference_mode():
                     _ = val_batch_processor(batch, dataloader)
 
-            val_batch_processor.on_end()
-            train_batch_processor.on_start()
+            val_batch_processor.on_end(fabric)
+            train_batch_processor.on_start(fabric)
 
         current_step += 1
-        pbar.update(1)
+        if fabric.is_global_zero:
+            pbar.update(1)
 
-    model.config.register_for_auto_class()
-    model.register_for_auto_class("AutoModel")
+            if (current_step + 1) % config.exp.save_every == 0:
+                model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+                tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+                group, name = str(config.exp.log_dir).split("/")[-2:]
+                model.push_to_hub(f"ILKT/{group}_{name}")
+                tokenizer.push_to_hub(f"ILKT/{group}_{name}")
 
-    model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
-    tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
-    group, name = str(config.exp.log_dir).split("/")[-2:]
-    model.push_to_hub(f"ILKT/{group}_{name}")
-    tokenizer.push_to_hub(f"ILKT/{group}_{name}")
+    if fabric.is_global_zero:
+        model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+        tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+        group, name = str(config.exp.log_dir).split("/")[-2:]
+        model.push_to_hub(f"ILKT/{group}_{name}")
+        tokenizer.push_to_hub(f"ILKT/{group}_{name}")
 
 
 if __name__ == "__main__":

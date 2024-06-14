@@ -8,6 +8,10 @@ config:
   embedding_head_config:
     pool_type: "cls"
     normalize_embeddings: true
+    n_dense: 0
+    use_batch_norm: true
+    use_layer_norm: false
+    dropout: 0.0
   mlm_head_config:
     n_dense: 0
     use_batch_norm: true

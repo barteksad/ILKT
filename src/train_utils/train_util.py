@@ -6,11 +6,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from lightning import Fabric
 
 import wandb
 
 from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
-from models import ILKTModel
+from models import ILKTModel, ForwardRouting
 
 __all__ = ["create_optimizer_v2"]
 
@@ -24,34 +25,48 @@ DL_TYPE = TypeVar(
 
 # here we combine API for models and datasets, this is the only place where we need to know model and dataset spec
 class BatchProcessor:
-    def on_start(self):
+    def on_start(self, fabric: Fabric):
         pass
 
-    def on_end(self):
+    def on_end(self, fabric: Fabric):
         pass
 
     @abstractmethod
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+        self,
+        model: ILKTModel,
+        batch: Dict[str, Any],
+        dataloader: DL_TYPE,
+        fabric: Fabric,
     ) -> Dict[str, Any]:
         pass
 
 
 class ModelOutputProcessor(BatchProcessor):
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+        self,
+        model: ILKTModel,
+        batch: Dict[str, Any],
+        dataloader: DL_TYPE,
+        fabric: Fabric,
     ) -> Dict[str, Any]:
         if isinstance(dataloader.dataset, ContrastiveDataset):
             model_outputs = (
-                model.get_sentence_embedding(**inp).pooler_output
+                model(
+                    **inp, forward_routing=ForwardRouting.GET_SENTENCE_EMBEDDING
+                ).pooler_output
                 for inp in batch["model_inputs"]  # type: ignore
             )
         elif isinstance(dataloader.dataset, SentenceClassificationDataset):
-            model_outputs = model.get_cls_output(
-                **batch, head_name=dataloader.dataset.name
+            model_outputs = model(
+                **batch,
+                head_name=dataloader.dataset.name,
+                forward_routing=ForwardRouting.GET_CLS_OUTPUT,
             )
         elif isinstance(dataloader.dataset, MLMDataset):
-            model_outputs = model.get_mlm_output(**batch)
+            model_outputs = model(
+                **batch, forward_routing=ForwardRouting.GET_CLS_OUTPUT
+            )
         else:
             raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
 
@@ -63,16 +78,21 @@ class ModelOutputProcessor(BatchProcessor):
 
 class LossProcessor(BatchProcessor):
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+        self,
+        model: ILKTModel,
+        batch: Dict[str, Any],
+        dataloader: DL_TYPE,
+        fabric: Fabric,
     ) -> Dict[str, Any]:
-        if isinstance(dataloader.dataset, ContrastiveDataset):
-            loss = dataloader.dataset.get_loss(batch)
-        elif isinstance(
-            dataloader.dataset, (MLMDataset, SentenceClassificationDataset)
-        ):
-            loss = batch["model_outputs"].loss
-        else:
-            raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
+        with fabric.autocast():
+            if isinstance(dataloader.dataset, ContrastiveDataset):
+                loss = dataloader.dataset.get_loss(batch)
+            elif isinstance(
+                dataloader.dataset, (MLMDataset, SentenceClassificationDataset)
+            ):
+                loss = batch["model_outputs"].loss
+            else:
+                raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
         return {"loss": loss}
 
 
@@ -80,15 +100,20 @@ class MetricProcessor(BatchProcessor):
     def __init__(self, keys_to_track: List[str]):
         self.keys_to_track = keys_to_track
 
-    def on_start(self):
+    def on_start(self, fabric: Fabric):
         self.values = defaultdict(int)
         self.counts = defaultdict(int)
 
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+        self,
+        model: ILKTModel,
+        batch: Dict[str, Any],
+        dataloader: DL_TYPE,
+        fabric: Fabric,
     ) -> Dict[str, Any]:
         for key in self.keys_to_track:
-            self.values[key] += batch[key].item()
+            reduced_tensor = fabric.all_reduce(batch[key], reduce_op="mean")
+            self.values[key] += reduced_tensor.item()
             self.counts[key] += 1
         return {
             **batch,
@@ -110,13 +135,17 @@ class WandbMetricLogger(BatchProcessor):
             value_to_log = value.item()
         wandb.log({f"{self.split}/{name}/{key}": value_to_log})
 
-    def on_start(self):
+    def on_start(self, fabric: Fabric):
         self.last_batch = {}
 
     def on_batch(
-        self, model: ILKTModel, batch: Dict[str, Any], dataloader: DL_TYPE
+        self,
+        model: ILKTModel,
+        batch: Dict[str, Any],
+        dataloader: DL_TYPE,
+        fabric: Fabric,
     ) -> Dict[str, Any]:
-        if self.log_per_batch:
+        if self.log_per_batch and fabric.is_global_zero:
             for key in self.keys_to_track:
                 self.log(dataloader.dataset.name, key, batch[key])
         else:
@@ -124,8 +153,8 @@ class WandbMetricLogger(BatchProcessor):
 
         return batch
 
-    def on_end(self):
-        if not self.log_per_batch:
+    def on_end(self, fabric: Fabric):
+        if not self.log_per_batch and fabric.is_global_zero:
             for dataset_name, metrics in self.last_batch.items():
                 for key in self.keys_to_track:
                     self.log(dataset_name, key, metrics[key])
@@ -139,19 +168,19 @@ class BatchProcessStrategy:
         self.model = model
         self.steps = steps
 
-    def on_start(self):
+    def on_start(self, fabric: Fabric):
         for step in self.steps:
-            step.on_start()
+            step.on_start(fabric)
 
-    def on_end(self):
+    def on_end(self, fabric: Fabric):
         for step in self.steps:
-            step.on_end()
+            step.on_end(fabric)
 
     def __call__(
-        self, batch: Dict[str, Any], dataloader: DL_TYPE
+        self, batch: Dict[str, Any], dataloader: DL_TYPE, fabric: Fabric
     ) -> BatchProcessOutput:
         for step in self.steps:
-            batch = step.on_batch(self.model, batch, dataloader)
+            batch = step.on_batch(self.model, batch, dataloader, fabric)
         return BatchProcessOutput(loss=batch["loss"])
 
 
