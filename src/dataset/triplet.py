@@ -18,15 +18,22 @@ class TripletDataset(ContrastiveDataset):
         batch_size: int,
         max_length: int,
         loss_fn: torch.nn.Module,
+        query_col_name: str,
+        positive_col_name: str,
+        negative_col_name: str,
+        subset: str = None,
         **kwargs
     ):
         super().__init__(name, tokenizer, batch_size)
 
-        self.dataset = load_dataset(name, "triplet", split=split, streaming=True)
+        self.dataset = load_dataset(name, subset, split=split, streaming=True)
         self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
         self.n_examples = n_examples
         self.max_length = max_length
         self.loss_fn = loss_fn
+        self.query_col_name = query_col_name
+        self.positive_col_name = positive_col_name
+        self.negative_col_name = negative_col_name
         
     def reset(self):
         self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
@@ -42,13 +49,13 @@ class TripletDataset(ContrastiveDataset):
         row = next(self.ds_iter)
 
         query = self.tokenizer(
-            row["query"], truncation=True, max_length=self.max_length
+            row[self.query_col_name], truncation=True, max_length=self.max_length
         )
         positive = self.tokenizer(
-            row["positive"], truncation=True, max_length=self.max_length
+            row[self.positive_col_name], truncation=True, max_length=self.max_length
         )
         negative = self.tokenizer(
-            row["negative"], truncation=True, max_length=self.max_length
+            row[self.negative_col_name], truncation=True, max_length=self.max_length
         )
 
         return {"query": query, "positive": positive, "negative": negative}
