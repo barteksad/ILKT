@@ -65,7 +65,7 @@ class ModelOutputProcessor(BatchProcessor):
             )
         elif isinstance(dataloader.dataset, MLMDataset):
             model_outputs = model(
-                **batch, forward_routing=ForwardRouting.GET_CLS_OUTPUT
+                **batch, forward_routing=ForwardRouting.GET_MLM_OUTPUT
             )
         else:
             raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
