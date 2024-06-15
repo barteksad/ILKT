@@ -7,22 +7,21 @@ from typing import Any, Dict
 from .base import ContrastiveDataset
 
 
-class TripletDataset(ContrastiveDataset):
+class QuestionAnswer(ContrastiveDataset):
 
     def __init__(
-        self,
-        name: str,
-        split: str,
-        n_examples: int,
-        tokenizer: PreTrainedTokenizer,
-        batch_size: int,
-        max_length: int,
-        loss_fn: torch.nn.Module,
-        query_col_name: str,
-        positive_col_name: str,
-        negative_col_name: str,
-        subset: str = None,
-        **kwargs
+            self,
+            name: str,
+            split: str,
+            n_examples: int,
+            tokenizer: PreTrainedTokenizer,
+            batch_size: int,
+            max_length: int,
+            loss_fn: torch.nn.Module,
+            query_column: str,
+            answer_column: str,
+            subset: str = None,
+            **kwargs
     ):
         super().__init__(name, tokenizer, batch_size)
 
@@ -31,13 +30,14 @@ class TripletDataset(ContrastiveDataset):
         self.n_examples = n_examples
         self.max_length = max_length
         self.loss_fn = loss_fn
-        self.query_col_name = query_col_name
-        self.positive_col_name = positive_col_name
-        self.negative_col_name = negative_col_name
-        
+        self.query_column = query_column
+        self.answer_column = answer_column
+
     def reset(self):
         self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
-        self.ds_iter = iter(self.dataset)
+        self.ds_iter_positive = iter(self.dataset)
+        self.ds_iter_negative = iter(self.dataset)
+        next(self.ds_iter_negative)
 
     def __len__(self) -> int:
         return self.n_examples
@@ -46,26 +46,25 @@ class TripletDataset(ContrastiveDataset):
         if idx == 0:
             self.reset()
 
-        row = next(self.ds_iter)
+        row_pos = next(self.ds_iter_positive)
+        row_neg = next(self.ds_iter_negative)
 
         query = self.tokenizer(
-            row[self.query_col_name], truncation=True, max_length=self.max_length
+            row_pos[self.query_column], truncation=True, max_length=self.max_length
         )
         positive = self.tokenizer(
-            row[self.positive_col_name], truncation=True, max_length=self.max_length
+            row_pos[self.answer_column], truncation=True, max_length=self.max_length
         )
         negative = self.tokenizer(
-            row[self.negative_col_name], truncation=True, max_length=self.max_length
+            row_neg[self.answer_column], truncation=True, max_length=self.max_length
         )
 
         return {"query": query, "positive": positive, "negative": negative}
 
     def get_data_collator(self):
-
         data_collator = DataCollatorWithPadding(self.tokenizer)
 
         def _collate_df(batch):
-
             query = data_collator([x["query"] for x in batch])
             positive = data_collator([x["positive"] for x in batch])
             negative = data_collator([x["negative"] for x in batch])

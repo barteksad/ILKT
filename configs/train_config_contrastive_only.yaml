@@ -5,8 +5,16 @@ defaults:
   - model: starter
   - train_datasets:
     - contrastive/all-nli/all-nli-pair-score.yaml
+    - contrastive/gooaq/gooaq.yaml
+    - contrastive/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1.yaml
     - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
+    - contrastive/natural-questions/natural-questions.yaml
+    - contrastive/quora-duplicates/quora-duplicates.yaml
+    - contrastive/squad/squad.yaml
     - contrastive/stsb/stsb.yaml
+    - contrastive/yahoo-answers/yahoo-answers.yaml
+  - val_datasets:
+    - contrastive/all-nli/all-nli-pair-score.yaml
 
 exp:
   log_dir: # set during runtime to automatically created dir

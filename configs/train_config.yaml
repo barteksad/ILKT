@@ -5,28 +5,40 @@ defaults:
   - model: starter
   - train_datasets:
     - contrastive/all-nli/all-nli-pair-score.yaml
+    - contrastive/gooaq/gooaq.yaml
+    - contrastive/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1.yaml
     - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
-#    - mlm/wikipedia/wikipedia.yaml
+    - contrastive/natural-questions/natural-questions.yaml
+    - contrastive/quora-duplicates/quora-duplicates.yaml
+    - contrastive/squad/squad.yaml
+    - contrastive/stsb/stsb.yaml
+    - contrastive/yahoo-answers/yahoo-answers.yaml
     - sentence_classification/klej-cdsc-e/klej-cdsc-e.yaml
     - sentence_classification/klej-psc/klej-psc.yaml
     - sentence_classification/klej-dyk/klej-dyk.yaml
+    - mlm/oscar/oscar.yaml
+    - mlm/allegro-summarization-articles/allegro-summarization-articles.yaml
+    - mlm/polemo2-official/polemo2-official.yaml
+    - mlm/polish-news/polish-news.yaml
+    # - mlm/wikipedia-pl/wikipedia-pl.yaml
 
   - val_datasets:
-      - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
-      - sentence_classification/klej-psc/klej-psc_valid.yaml
-      - sentence_classification/klej-dyk/klej-dyk_valid.yaml
+    - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
+    - sentence_classification/klej-psc/klej-psc_valid.yaml
+    - sentence_classification/klej-dyk/klej-dyk_valid.yaml
+    - mlm/allegro-summarization-articles/allegro-summarization-articles.yaml
 
 exp:
   log_dir: # set during runtime to automatically created dir
   pretrained_model_name_or_path: microsoft/mdeberta-v3-base
-  max_length: 256
-  batch_size: 32
+  max_length: 128
+  batch_size: 8
   seed: 42
-  training_steps: 40_001
-  n_examples: 20_000
-  n_examples_valid: 10_000
-  validate_every: 10_000
-  save_every: 10_000
+  training_steps: 20_000
+  n_examples: 10_000
+  n_examples_valid: 1000
+  validate_every: 1000
+  save_every: 1000
   optimizer:
     opt: "adamw"
     lr: 5e-5

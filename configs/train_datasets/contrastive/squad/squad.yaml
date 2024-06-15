@@ -1,13 +1,11 @@
-_target_: dataset.TripletDataset
-name: "sentence-transformers/msmarco-msmarco-distilbert-base-tas-b"
+_target_: dataset.QuestionAnswer
+name: "sentence-transformers/squad"
 split: "train"
 n_examples: ${exp.n_examples}
 max_length: ${exp.max_length}
 batch_size: ${exp.batch_size}
-query_col_name: "query"
-positive_col_name: "positive"
-negative_col_name: "negative"
-subset: "triplet"
+query_column: "question"
+answer_column: "answer"
 loss_fn:
   _target_: sentence_transformers.losses.TripletLoss
   model:

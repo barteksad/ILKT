@@ -1,5 +1,5 @@
 _target_: dataset.TripletDataset
-name: "sentence-transformers/msmarco-msmarco-distilbert-base-tas-b"
+name: "sentence-transformers/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1"
 split: "train"
 n_examples: ${exp.n_examples}
 max_length: ${exp.max_length}

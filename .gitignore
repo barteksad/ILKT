@@ -7,3 +7,4 @@ outputs
 slurm_logs
 wandb
 benchmarks/pl-mteb/env
+checkpoints
