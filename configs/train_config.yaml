@@ -18,6 +18,9 @@ defaults:
     - sentence_classification/klej-dyk/klej-dyk.yaml
     - mlm/oscar/oscar.yaml
     - mlm/allegro-summarization-articles/allegro-summarization-articles.yaml
+    - mlm/polemo2-official/polemo2-official.yaml
+    - mlm/polish-news/polish-news.yaml
+    - mlm/wikipedia-pl/wikipedia-pl.yaml
 
   - val_datasets:
     - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
