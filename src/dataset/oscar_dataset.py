@@ -5,7 +5,7 @@ from transformers import PreTrainedTokenizer
 from .base import MLMDataset
 
 
-class WikipediaDataset(MLMDataset):
+class OscarDataset(MLMDataset):
     def __init__(
         self,
         name: str,
