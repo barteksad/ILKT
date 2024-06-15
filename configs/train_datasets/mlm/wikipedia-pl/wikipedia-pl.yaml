@@ -1,5 +1,5 @@
 _target_: dataset.OscarDataset
-name: "allegro/polemo2-official-en"
+name: "teddy-f-47/wikipedia_pl_20231201"
 language: ""
 split: "train"
 n_examples: ${exp.n_examples}
