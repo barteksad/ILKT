@@ -16,11 +16,12 @@ class PairScoreDataset(ContrastiveDataset):
         batch_size: int,
         max_length: int,
         loss_fn: torch.nn.Module,
+        type: str = "pair-score",
         **kwargs
     ):
         super().__init__(name, tokenizer, batch_size)
 
-        self.dataset = load_dataset(name, "pair-score", split=split, streaming=True)
+        self.dataset = load_dataset(name, type, split=split, streaming=True)
         self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)  # type: ignore
         self.n_examples = n_examples
         self.max_length = max_length

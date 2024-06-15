@@ -6,6 +6,7 @@ defaults:
   - train_datasets:
     - contrastive/all-nli/all-nli-pair-score.yaml
     - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
+    - contrastive/stsb/stsb.yaml
 
 exp:
   log_dir: # set during runtime to automatically created dir
@@ -13,13 +14,14 @@ exp:
   max_length: 256
   batch_size: 32
   seed: 42
-  training_steps: 1_000_001
-  n_examples: 100_000
-  n_examples_valid: 100_000
-  validate_every: 100_000
+  training_steps: 40_001
+  n_examples: 20_000
+  n_examples_valid: 10_000
+  validate_every: 10_000
+  save_every: 10_000
   optimizer:
-    opt: "adamw"
-    lr: 5e-5
+    opt: "adam"
+    lr: 2e-5
     weight_decay: 0.0
     filter_bias_and_bn: true
 
@@ -27,6 +29,7 @@ fabric:
   _target_: lightning.Fabric
   num_nodes: 1
   devices: 1
+  accelerator: "cuda"
 
 wandb:
   project: "inter-lingual_knowledge_transferring_in_NLP_embeddings"

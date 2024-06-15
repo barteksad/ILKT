@@ -1,0 +1,11 @@
+_target_: dataset.PairScoreDataset
+name: "sentence-transformers/stsb"
+split: "train"
+n_examples: ${exp.n_examples}
+max_length: ${exp.max_length}
+batch_size: ${exp.batch_size}
+type: "default"
+loss_fn:
+  _target_: sentence_transformers.losses.CosineSimilarityLoss
+  model:
+    _target_: torch.nn.Identity

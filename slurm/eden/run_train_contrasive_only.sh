@@ -19,7 +19,6 @@ source /mnt/evafs/groups/mi2lab/bsobieski/scripts/conda/import.sh
 cd ~/ILKT
 cload ~/my_conda.tar
 conda activate ilkt
-
 source .env
 wandb login $WANDB_API_KEY
 git config --global credential.helper store
