@@ -8,7 +8,7 @@ import sys
 import logging
 
 from sentence_transformers import SentenceTransformer, SentenceTransformerModelCardData
-
+from sentence_transformers.models import Normalize, Pooling, Transformer
 from mteb import MTEB
 
 
@@ -34,23 +34,29 @@ sts_tasks = ["SICK-R-PL", "CDSC-R", "STS22", "STSBenchmarkMultilingualSTS"]
 tasks = classification_tasks + clustering_tasks + pair_classification_tasks + sts_tasks
 model_id = sys.argv[1].strip()
 
-model = SentenceTransformer(
+transformer_model = Transformer(
     model_name_or_path=model_id,
-    trust_remote_code=True,
-    revision="main",
+    config_args={"trust_remote_code": True},
+    model_args={"trust_remote_code": True},
+    tokenizer_args={
+        "model_max_length": 256,
+    },
+)
+pooling = Pooling(transformer_model.get_word_embedding_dimension(), "cls")
+
+model = SentenceTransformer(
+    modules=[transformer_model, pooling, Normalize()],
     model_card_data=SentenceTransformerModelCardData(
         language="pl",
         license="apache-2.0",
         model_name=model_id.split("/")[1],
         model_id=model_id,
     ),
-    tokenizer_kwargs={
-        "model_max_length": 128,
-    },
 )
 
-evaluation = MTEB(tasks=tasks, task_langs=["pl"])
-evaluation.run(
-    # TODO: batch size and max length <- not to run into OOM
-    model, output_folder=f"results/pl/{model_id.split('/')[-1]}",# batch_size=32
-)
+
+# evaluation = MTEB(tasks=tasks, task_langs=["pl"])
+# evaluation.run(
+#     model,
+#     output_folder=f"results/pl/{model_id.split('/')[-1]}",  # batch_size=32
+# )
