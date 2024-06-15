@@ -76,12 +76,12 @@ def main(config: DictConfig):
     while current_step < TRAINING_STEPS:
         # ----------------- training -----------------
         model.train()
-        optimizer.zero_grad()
         for batch, dataloader in train_iterator:
+            optimizer.zero_grad()
             train_batch_output = train_batch_processor(batch, dataloader, fabric)
             loss = train_batch_output.loss
             fabric.backward(loss)
-        optimizer.step()
+            optimizer.step()
 
         # ----------------- validation -----------------
         if (current_step + 1) % config.exp.validate_every == 0:

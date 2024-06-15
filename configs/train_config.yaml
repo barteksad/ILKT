@@ -20,7 +20,7 @@ defaults:
     - mlm/allegro-summarization-articles/allegro-summarization-articles.yaml
     - mlm/polemo2-official/polemo2-official.yaml
     - mlm/polish-news/polish-news.yaml
-    - mlm/wikipedia-pl/wikipedia-pl.yaml
+    # - mlm/wikipedia-pl/wikipedia-pl.yaml
 
   - val_datasets:
     - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
@@ -31,14 +31,14 @@ defaults:
 exp:
   log_dir: # set during runtime to automatically created dir
   pretrained_model_name_or_path: microsoft/mdeberta-v3-base
-  max_length: 256
+  max_length: 128
   batch_size: 8
   seed: 42
-  training_steps: 5000
-  n_examples: 20_000
+  training_steps: 20_000
+  n_examples: 10_000
   n_examples_valid: 1000
-  validate_every: 100
-  save_every: 10_000
+  validate_every: 1000
+  save_every: 1000
   optimizer:
     opt: "adamw"
     lr: 5e-5
