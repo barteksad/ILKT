@@ -4,15 +4,15 @@ defaults:
   - _self_
   - model: starter
   - train_datasets:
-#    - contrastive/all-nli/all-nli-pair-score.yaml
-#    - contrastive/gooaq/gooaq.yaml
-#    - contrastive/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1.yaml
-#    - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
-#    - contrastive/natural-questions/natural-questions.yaml
-#    - contrastive/quora-duplicates/quora-duplicates.yaml
-#    - contrastive/squad/squad.yaml
-#    - contrastive/stsb/stsb.yaml
-#    - contrastive/yahoo-answers/yahoo-answers.yaml
+    - contrastive/all-nli/all-nli-pair-score.yaml
+    - contrastive/gooaq/gooaq.yaml
+    - contrastive/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1.yaml
+    - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
+    - contrastive/natural-questions/natural-questions.yaml
+    - contrastive/quora-duplicates/quora-duplicates.yaml
+    - contrastive/squad/squad.yaml
+    - contrastive/stsb/stsb.yaml
+    - contrastive/yahoo-answers/yahoo-answers.yaml
     - sentence_classification/klej-cdsc-e/klej-cdsc-e.yaml
     - sentence_classification/klej-psc/klej-psc.yaml
     - sentence_classification/klej-dyk/klej-dyk.yaml
@@ -34,7 +34,7 @@ exp:
   max_length: 256
   batch_size: 8
   seed: 42
-  training_steps: 1000
+  training_steps: 5000
   n_examples: 20_000
   n_examples_valid: 1000
   validate_every: 100
