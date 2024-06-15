@@ -27,10 +27,10 @@ torch.set_float32_matmul_precision("high")
 
 
 def get_fabric(config) -> Fabric:
-    if torch.cuda.is_bf16_supported():
-        fabric = instantiate(config.fabric, precision="bf16-mixed")
-    else:
-        fabric = instantiate(config.fabric)
+    # if torch.cuda.is_bf16_supported():
+    #     fabric = instantiate(config.fabric, precision="bf16-mixed")
+    # else:
+    fabric = instantiate(config.fabric)
     fabric.seed_everything(config.exp.seed)
     fabric.launch()
     return fabric
@@ -76,12 +76,12 @@ def main(config: DictConfig):
     while current_step < TRAINING_STEPS:
         # ----------------- training -----------------
         model.train()
+        optimizer.zero_grad()
         for batch, dataloader in train_iterator:
-            optimizer.zero_grad()
             train_batch_output = train_batch_processor(batch, dataloader, fabric)
             loss = train_batch_output.loss
             fabric.backward(loss)
-            optimizer.step()
+        optimizer.step()
 
         # ----------------- validation -----------------
         if (current_step + 1) % config.exp.validate_every == 0:
@@ -90,7 +90,7 @@ def main(config: DictConfig):
             model.eval()
             for batch, dataloader in valid_iterator:
                 with torch.inference_mode():
-                    _ = val_batch_processor(batch, dataloader)
+                    _ = val_batch_processor(batch, dataloader, fabric)
 
             val_batch_processor.on_end(fabric)
             train_batch_processor.on_start(fabric)

@@ -291,12 +291,14 @@ def create_optimizer_v2(
     opt_split = opt_lower.split("_")
     opt_lower = opt_split[-1]
 
-    opt_args = dict(weight_decay=weight_decay, **kwargs)
+    opt_args = dict(weight_decay=weight_decay, lr=lr, **kwargs)
 
     if opt_lower == "adam":
         optimizer = optim.Adam(parameters, **opt_args)
     elif opt_lower == "adamw":
         optimizer = optim.AdamW(parameters, **opt_args)
+    elif opt_lower == "sgd":
+        optimizer = optim.SGD(parameters, momentum=momentum, **opt_args)
     else:
         raise NotImplementedError(f"Optimizer {opt} not implemented")
 
