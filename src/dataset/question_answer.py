@@ -46,7 +46,7 @@ class QuestionAnswer(ContrastiveDataset):
         if idx == 0:
             self.reset()
 
-        row_pos = next(self.ds_iter)
+        row_pos = next(self.ds_iter_positive)
         row_neg = next(self.ds_iter_negative)
 
         query = self.tokenizer(
