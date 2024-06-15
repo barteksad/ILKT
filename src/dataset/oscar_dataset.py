@@ -19,10 +19,14 @@ class OscarDataset(MLMDataset):
         text_column: str = "text",
     ):
         super().__init__(name, tokenizer, batch_size, mlm_probability)
-
-        self.dataset = load_dataset(
-            name, language, split=split, streaming=True, token=True, trust_remote_code=True
-        )
+        if language != "":
+            self.dataset = load_dataset(
+                name, language, split=split, streaming=True, token=True, trust_remote_code=True
+            )
+        else:
+            self.dataset = load_dataset(
+                name, split=split, streaming=True, token=True, trust_remote_code=True
+            )
         self.dataset = self.dataset.shuffle()
         self.n_examples = n_examples
         self.max_length = max_length

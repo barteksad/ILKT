@@ -1,6 +1,6 @@
 _target_: dataset.OscarDataset
 name: "allegro/summarization-allegro-articles"
-language: ${None}
+language: ""
 split: "validation"
 n_examples: ${exp.n_examples}
 max_length: ${exp.max_length}
