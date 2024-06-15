@@ -28,7 +28,7 @@ class SingleBatchPerDatasetIterator(DataIterator):
         for idx, dataloader in enumerate(self.dataloaders):
             try:
                 batch = next(self.iter_dataloaders[idx])  # type: ignore
-            except StopIteration:
+            except:
                 self.iter_dataloaders[idx] = iter(self.dataloaders[idx])  # type: ignore
                 batch = next(self.iter_dataloaders[idx])  # type: ignore
             yield batch, dataloader
