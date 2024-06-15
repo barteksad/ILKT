@@ -13,6 +13,9 @@ defaults:
     - contrastive/squad/squad.yaml
     - contrastive/stsb/stsb.yaml
     - contrastive/yahoo-answers/yahoo-answers.yaml
+    - sentence_classification/klej-cdsc-e/klej-cdsc-e.yaml
+    - sentence_classification/klej-psc/klej-psc.yaml
+    - sentence_classification/klej-dyk/klej-dyk.yaml
 
   - val_datasets:
       - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
