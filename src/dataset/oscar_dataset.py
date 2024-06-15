@@ -16,6 +16,7 @@ class OscarDataset(MLMDataset):
         n_examples: int,
         max_length: int,
         mlm_probability: float,
+        text_column: str = "text",
     ):
         super().__init__(name, tokenizer, batch_size, mlm_probability)
 
@@ -25,6 +26,7 @@ class OscarDataset(MLMDataset):
         self.dataset = self.dataset.shuffle()
         self.n_examples = n_examples
         self.max_length = max_length
+        self.text_column = text_column
 
     def reset(self):
         self.dataset = self.dataset.shuffle()
@@ -38,6 +40,6 @@ class OscarDataset(MLMDataset):
             self.reset()
 
         row = next(self.ds_iter)
-        text = row["text"]
+        text = row[self.text_column]
 
         return self.tokenizer(text, truncation=True, max_length=self.max_length)

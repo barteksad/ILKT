@@ -17,11 +17,13 @@ defaults:
     - sentence_classification/klej-psc/klej-psc.yaml
     - sentence_classification/klej-dyk/klej-dyk.yaml
     - mlm/oscar/oscar.yaml
+    - mlm/summarization-allegro-articles/summarization-allegro-articles.yaml
 
   - val_datasets:
-      - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
-      - sentence_classification/klej-psc/klej-psc_valid.yaml
-      - sentence_classification/klej-dyk/klej-dyk_valid.yaml
+    - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
+    - sentence_classification/klej-psc/klej-psc_valid.yaml
+    - sentence_classification/klej-dyk/klej-dyk_valid.yaml
+    - mlm/summarization-allegro-articles/summarization-allegro-articles.yaml
 
 exp:
   log_dir: # set during runtime to automatically created dir
