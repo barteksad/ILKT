@@ -2,30 +2,33 @@
 
 defaults:
   - _self_
-  - model: starter
-  - train_datasets:
-    - contrastive/all-nli/all-nli-pair-score.yaml
-    - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
-#    - mlm/wikipedia/wikipedia.yaml
-    - sentence_classification/klej-cdsc-e/klej-cdsc-e.yaml
-    - sentence_classification/klej-psc/klej-psc.yaml
-    - sentence_classification/klej-dyk/klej-dyk.yaml
+      - model: starter
+      - train_datasets:
+          - contrastive/all-nli/all-nli-pair-score.yaml
+          - contrastive/gooaq/gooaq.yaml
+          - contrastive/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1.yaml
+          - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
+          - contrastive/natural-questions/natural-questions.yaml
+          - contrastive/quora-duplicates/quora-duplicates.yaml
+          - contrastive/squad/squad.yaml
+          - contrastive/stsb/stsb.yaml
+          - contrastive/yahoo-answers/yahoo-answers.yaml
 
-  - val_datasets:
-      - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
-      - sentence_classification/klej-psc/klej-psc_valid.yaml
-      - sentence_classification/klej-dyk/klej-dyk_valid.yaml
+      - val_datasets:
+          - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
+          - sentence_classification/klej-psc/klej-psc_valid.yaml
+          - sentence_classification/klej-dyk/klej-dyk_valid.yaml
 
 exp:
   log_dir: # set during runtime to automatically created dir
   pretrained_model_name_or_path: microsoft/mdeberta-v3-base
   max_length: 256
-  batch_size: 32
+  batch_size: 8
   seed: 42
-  training_steps: 40_001
+  training_steps: 1000
   n_examples: 20_000
-  n_examples_valid: 10_000
-  validate_every: 10_000
+  n_examples_valid: 1000
+  validate_every: 100
   save_every: 10_000
   optimizer:
     opt: "adamw"

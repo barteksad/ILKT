@@ -1,0 +1,12 @@
+_target_: dataset.QuestionAnswer
+name: "sentence-transformers/squad"
+split: "train"
+n_examples: ${exp.n_examples}
+max_length: ${exp.max_length}
+batch_size: ${exp.batch_size}
+query_column: "question"
+answer_column: "answer"
+loss_fn:
+  _target_: sentence_transformers.losses.TripletLoss
+  model:
+    _target_: torch.nn.Identity
