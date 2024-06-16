@@ -1,8 +1,8 @@
 import torch
 from datasets import load_dataset
-from torch.utils.data import DataLoader
 from transformers import DataCollatorWithPadding, PreTrainedTokenizer
-from typing import Any, Dict
+from sentence_transformers.evaluation import TripletEvaluator
+from typing import Any, Dict, Optional
 
 from .base import ContrastiveDataset
 
@@ -13,7 +13,6 @@ class TripletDataset(ContrastiveDataset):
         self,
         name: str,
         split: str,
-        n_examples: int,
         tokenizer: PreTrainedTokenizer,
         batch_size: int,
         max_length: int,
@@ -22,31 +21,23 @@ class TripletDataset(ContrastiveDataset):
         positive_col_name: str,
         negative_col_name: str,
         subset: str = None,
-        **kwargs
+        n_examples: Optional[int] = None,
+        **kwargs,
     ):
-        super().__init__(name, tokenizer, batch_size)
 
-        self.dataset = load_dataset(name, subset, split=split, streaming=True)
-        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
-        self.n_examples = n_examples
+        dataset = load_dataset(name, subset, split=split, streaming=True)
+        dataset = dataset.shuffle(seed=42, buffer_size=10_000)
+        if n_examples is not None:
+            dataset = dataset.take(n_examples)
+        dataset = dataset.with_format("torch")
         self.max_length = max_length
         self.loss_fn = loss_fn
         self.query_col_name = query_col_name
         self.positive_col_name = positive_col_name
         self.negative_col_name = negative_col_name
-        
-    def reset(self):
-        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
-        self.ds_iter = iter(self.dataset)
+        super().__init__(name, tokenizer, batch_size, dataset)
 
-    def __len__(self) -> int:
-        return self.n_examples
-
-    def __getitem__(self, idx: int):
-        if idx == 0:
-            self.reset()
-
-        row = next(self.ds_iter)
+    def _process_row(self, row: Any) -> Dict[str, Any]:
 
         query = self.tokenizer(
             row[self.query_col_name], truncation=True, max_length=self.max_length
@@ -84,3 +75,11 @@ class TripletDataset(ContrastiveDataset):
         ]
 
         return self.loss_fn(sentence_features, labels=None)
+
+    def get_evaluator(self):
+        return TripletEvaluator(
+            anchors=[i[self.query_col_name] for i in self.dataset],
+            positives=[i[self.positive_col_name] for i in self.dataset],
+            negatives=[i[self.negative_col_name] for i in self.dataset],
+            name=self.name,
+        )

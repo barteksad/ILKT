@@ -19,14 +19,13 @@ defaults:
 exp:
   log_dir: # set during runtime to automatically created dir
   pretrained_model_name_or_path: microsoft/mdeberta-v3-base
-  max_length: 256
-  batch_size: 32
+  max_length: 128
+  batch_size: 4
   seed: 42
-  training_steps: 40_001
-  n_examples: 20_000
-  n_examples_valid: 10_000
-  validate_every: 10_000
-  save_every: 10_000
+  training_steps: 20_000
+  validate_every: 1000
+  n_examples_per_valid_dataset: 1000
+  save_every: 1000
   optimizer:
     opt: "adam"
     lr: 2e-5
@@ -37,7 +36,6 @@ fabric:
   _target_: lightning.Fabric
   num_nodes: 1
   devices: 1
-  accelerator: "cuda"
 
 wandb:
   project: "inter-lingual_knowledge_transferring_in_NLP_embeddings"

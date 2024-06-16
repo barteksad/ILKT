@@ -2,7 +2,6 @@ _target_: dataset.SentenceClassificationDataset
 name: "allegro/klej-psc"
 split: "train"
 n_classes: 2
-n_examples: ${exp.n_examples}
 max_length: ${exp.max_length}
 batch_size: ${exp.batch_size}
 sentence_keys: 

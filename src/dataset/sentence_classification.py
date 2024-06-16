@@ -1,8 +1,7 @@
 from datasets import load_dataset
 from transformers import PreTrainedTokenizer
-from typing import List, Optional, Dict
+from typing import Any, List, Optional, Dict
 from .base import ClassificationDataset
-
 
 class SentenceClassificationDataset(ClassificationDataset):
 
@@ -12,35 +11,32 @@ class SentenceClassificationDataset(ClassificationDataset):
         tokenizer: PreTrainedTokenizer,
         batch_size: int,
         split: str,
-        n_examples: int,
         max_length: int,
         n_classes: int,
         sentence_keys: List[str],
         label_key: str,
         label_mapping: Optional[Dict[str, int]] = None,
+        n_examples: Optional[int] = None,
     ):
 
-        super().__init__(
-            name, tokenizer, batch_size, n_classes, sentence_keys, label_key
-        )
-        self.dataset = load_dataset(name, split=split, streaming=True)
-        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
-        self.n_examples = n_examples
+        dataset = load_dataset(name, split=split, streaming=True)
+        dataset = dataset.shuffle(seed=42, buffer_size=10_000)
+        if n_examples is not None:
+            dataset = dataset.take(n_examples)
+        dataset = dataset.with_format("torch")
         self.max_length = max_length
         self.label_mapping = label_mapping
-        
-    def reset(self):
-        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
-        self.ds_iter = iter(self.dataset)
+        super().__init__(
+            name,
+            tokenizer,
+            batch_size,
+            n_classes,
+            sentence_keys,
+            label_key,
+            dataset,
+        )
 
-    def __len__(self) -> int:
-        return self.n_examples
-
-    def __getitem__(self, idx: int):
-        if idx == 0:
-            self.reset()
-
-        row = next(self.ds_iter)
+    def _process_row(self, row: Any) -> Dict[str, Any]:
 
         texts = [row[key] for key in self.sentence_keys]
         labels = row[self.label_key]

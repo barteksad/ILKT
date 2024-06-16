@@ -1,12 +1,26 @@
 from abc import abstractmethod
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from lightning import Fabric
+
+from transformers import PreTrainedTokenizer
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import Normalize, Pooling
 
 import wandb
 
@@ -209,6 +223,82 @@ class ValidationBatchProcessStrategy(BatchProcessStrategy):
                 WandbMetricLogger("val", ["loss"], log_per_batch=False),
             ]
         super().__init__(model, steps)
+
+
+def custom_transformer2sentence_transformer(
+    tokenizer: PreTrainedTokenizer, model: ILKTModel
+):
+
+    class DummyWrapper(nn.Module):
+        def tokenize(
+            self,
+            texts: Union[List[str], List[Dict], List[Tuple[str, str]]],
+            padding: Union[str, bool] = True,
+        ):
+            """Tokenizes a text and maps tokens to token-ids"""
+            output = {}
+            if isinstance(texts[0], str):
+                to_tokenize = [texts]
+            elif isinstance(texts[0], dict):
+                to_tokenize = []
+                output["text_keys"] = []
+                for lookup in texts:
+                    text_key, text = next(iter(lookup.items()))
+                    to_tokenize.append(text)
+                    output["text_keys"].append(text_key)
+                to_tokenize = [to_tokenize]
+            else:
+                batch1, batch2 = [], []
+                for text_tuple in texts:
+                    batch1.append(text_tuple[0])
+                    batch2.append(text_tuple[1])
+                to_tokenize = [batch1, batch2]
+
+            # strip
+            to_tokenize = [[str(s).strip() for s in col] for col in to_tokenize]
+
+            output.update(
+                tokenizer(
+                    *to_tokenize,
+                    padding=padding,
+                    truncation="longest_first",
+                    return_tensors="pt",
+                    max_length=model.config.max_length,
+                )
+            )
+
+            # data_collator = DataCollatorWithPadding(tokenizer)
+            # output = data_collator(output)
+
+            return output
+
+        def forward(self, features):
+            for k, v in features.items():
+                if isinstance(v, torch.Tensor):
+                    features[k] = v.to(model.device)
+
+            output_states = model(
+                **features,
+            )
+            output_tokens = output_states[0]
+
+            features.update(
+                {
+                    "token_embeddings": output_tokens,
+                    "attention_mask": features["attention_mask"],
+                }
+            )
+            return features
+
+    pooling = Pooling(
+        model.config.hidden_size, model.config.embedding_head_config["pool_type"]
+    )
+
+    sentence_transformer_model = SentenceTransformer(
+        modules=[DummyWrapper(), pooling, Normalize()],
+    )
+
+    return sentence_transformer_model
 
 
 """

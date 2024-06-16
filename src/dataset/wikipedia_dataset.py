@@ -1,7 +1,6 @@
 from datasets import load_dataset
-from torch.utils.data import DataLoader
 from transformers import PreTrainedTokenizer
-
+from typing import Any, Dict, Optional
 from .base import MLMDataset
 
 
@@ -14,31 +13,21 @@ class WikipediaDataset(MLMDataset):
         tokenizer: PreTrainedTokenizer,
         batch_size: int,
         split: str,
-        n_examples: int,
         max_length: int,
         mlm_probability: float,
+        n_examples: Optional[int] = None,
     ):
-        super().__init__(name, tokenizer, batch_size, mlm_probability)
 
-        self.dataset = load_dataset(
+        dataset = load_dataset(
             name, language=language, date=date, split=split, streaming=True
         )
-        self.dataset = self.dataset.shuffle()
-        self.n_examples = n_examples
+        dataset = dataset.shuffle(seed=42, buffer_size=10_000)
+        if n_examples is not None:
+            dataset = dataset.take(n_examples)
         self.max_length = max_length
+        super().__init__(name, tokenizer, batch_size, mlm_probability, dataset)
 
-    def reset(self):
-        self.dataset = self.dataset.shuffle()
-        self.ds_iter = iter(self.dataset)
-
-    def __len__(self) -> int:
-        return self.n_examples
-
-    def __getitem__(self, idx: int):
-        if idx == 0:
-            self.reset()
-
-        row = next(self.ds_iter)
+    def _process_row(self, row: Any) -> Dict[str, Any]:
         text = row["text"]
 
         return self.tokenizer(text, truncation=True, max_length=self.max_length)

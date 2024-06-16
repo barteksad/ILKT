@@ -2,7 +2,7 @@ _target_: dataset.SentenceClassificationDataset
 name: "allegro/klej-cdsc-e"
 split: "validation"
 n_classes: 3
-n_examples: ${exp.n_examples_valid}
+n_examples: ${exp.n_examples_per_valid_dataset}
 max_length: ${exp.max_length}
 batch_size: ${exp.batch_size}
 sentence_keys: 

@@ -1,7 +1,6 @@
 _target_: dataset.TripletDataset
 name: "sentence-transformers/msmarco-msmarco-distilbert-base-tas-b"
 split: "train"
-n_examples: ${exp.n_examples}
 max_length: ${exp.max_length}
 batch_size: ${exp.batch_size}
 query_col_name: "query"

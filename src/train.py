@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import List
 
 import hydra
 import torch
@@ -8,18 +7,21 @@ from tqdm.auto import tqdm
 from hydra.utils import instantiate
 from lightning import Fabric
 from omegaconf import DictConfig
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoTokenizer
+import wandb
 
-from train_utils.data_iterator import SingleBatchPerDatasetIterator, FullValidIterator
+from train_utils.data_iterator import SingleBatchPerDatasetIterator
 from train_utils.dataset_loader import DatasetLoader
 from utils import extract_output_dir, preprocess_config, setup_wandb
 from train_utils.train_util import (
     TrainBatchProcessStrategy,
-    ValidationBatchProcessStrategy,
 )
 
-from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
-from train_utils.train_util import create_optimizer_v2
+from dataset import ContrastiveDataset, SentenceClassificationDataset
+from train_utils.train_util import (
+    create_optimizer_v2,
+    custom_transformer2sentence_transformer,
+)
 
 log = logging.getLogger(__name__)
 
@@ -53,23 +55,26 @@ def main(config: DictConfig):
             cls_heads.append((dataloader.dataset.n_classes, dataloader.dataset.name))
 
     config.model.config["cls_heads"] = cls_heads
-    model = instantiate(config.model, _convert_="all")
+    with fabric.init_module():
+        model = instantiate(config.model, _convert_="all")
     optimizer = create_optimizer_v2(model, **config.exp.optimizer)
+    scheduler = instantiate(config.exp.scheduler, optimizer=optimizer)
     model, optimizer = fabric.setup(model, optimizer)
 
     model.config.register_for_auto_class()
     model.register_for_auto_class("AutoModel")
 
+    st_model_wrapper = custom_transformer2sentence_transformer(tokenizer, model)
+
     TRAINING_STEPS = config.exp.training_steps
+    NEXT_VALIDATION_STEP = config.exp.validate_every
 
     current_step = 0
 
     train_batch_processor = TrainBatchProcessStrategy(model)
     train_batch_processor.on_start(fabric)
-    val_batch_processor = ValidationBatchProcessStrategy(model)
 
     train_iterator = SingleBatchPerDatasetIterator(dataset_loader.train_dataloaders)
-    valid_iterator = FullValidIterator(dataset_loader.val_dataloaders)
 
     if fabric.is_global_zero:
         pbar = tqdm(total=TRAINING_STEPS, position=0, leave=True)
@@ -82,22 +87,45 @@ def main(config: DictConfig):
             loss = train_batch_output.loss
             fabric.backward(loss)
             optimizer.step()
+            scheduler.step()
+
+            current_step += 1
+            if fabric.is_global_zero:
+                pbar.update(1)
 
         # ----------------- validation -----------------
-        if (current_step + 1) % config.exp.validate_every == 0:
-            train_batch_processor.on_end(fabric)
-            val_batch_processor.on_start(fabric)
-            model.eval()
-            for batch, dataloader in valid_iterator:
-                with torch.inference_mode():
-                    _ = val_batch_processor(batch, dataloader, fabric)
+        if (current_step + 1) > NEXT_VALIDATION_STEP:
+            if fabric.is_global_zero:
+                log.info("Validation Step")
+                train_batch_processor.on_end(fabric)
+                model.eval()
+                epoch = current_step // config.exp.validate_every
+                output_path = output_dir / f"eval_epoch_{epoch}"
+                output_path.mkdir(parents=True, exist_ok=True)
 
-            val_batch_processor.on_end(fabric)
+                for dataloader in dataset_loader.val_dataloaders:
+                    if isinstance(dataloader.dataset, ContrastiveDataset):
+                        evaluator = dataloader.dataset.get_evaluator()
+                        with torch.inference_mode():
+
+                            results = evaluator(
+                                st_model_wrapper,
+                                epoch=epoch,
+                                output_path=output_path.as_posix(),
+                            )
+                            print(results)
+                            for k, v in results.items():
+                                wandb.log({f"{dataloader.dataset.name}/{k}": v})
+
+                    else:
+                        y_true = []
+                        y_pred = []
+
+                        # for batch in dataloader:
+
             train_batch_processor.on_start(fabric)
 
-        current_step += 1
-        if fabric.is_global_zero:
-            pbar.update(1)
+            NEXT_VALIDATION_STEP += config.exp.validate_every
 
             if (current_step + 1) % config.exp.save_every == 0:
                 model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
