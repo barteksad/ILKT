@@ -35,7 +35,7 @@ class TripletDataset(ContrastiveDataset):
         self.query_col_name = query_col_name
         self.positive_col_name = positive_col_name
         self.negative_col_name = negative_col_name
-        super().__init__(name, tokenizer, batch_size, dataset)
+        super().__init__(name, tokenizer, batch_size, dataset, n_examples)
 
     def _process_row(self, row: Any) -> Dict[str, Any]:
 

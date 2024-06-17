@@ -18,11 +18,13 @@ class TextDataset(ABC, IterableDataset):
         tokenizer: PreTrainedTokenizer,
         batch_size: int,
         dataset: IterableDataset,
+        n_examples: int,
     ):
         self.name = "--".join(name.split("/"))
         self.tokenizer = tokenizer
         self.batch_size = batch_size
         self.dataset = dataset
+        self.n_examples = n_examples
 
     def reset(self):
         self.ds_iter = iter(self.dataset)
@@ -66,7 +68,10 @@ class TextDataset(ABC, IterableDataset):
                     for _ in range(stride):
                         _ = next(self.ds_iter)
                 except StopIteration:
-                    break
+                    if self.n_examples is not None:
+                        return
+                    else:
+                        break
 
 
 class ContrastiveDataset(TextDataset):
@@ -77,8 +82,9 @@ class ContrastiveDataset(TextDataset):
         tokenizer: PreTrainedTokenizer,
         batch_size: int,
         dataset: IterableDataset,
+        n_examples: int,
     ):
-        super().__init__(name, tokenizer, batch_size, dataset)
+        super().__init__(name, tokenizer, batch_size, dataset, n_examples)
 
     @abstractmethod
     def get_data_collator(self) -> Any:
@@ -102,8 +108,9 @@ class MLMDataset(TextDataset):
         batch_size: int,
         mlm_probability: float,
         dataset: IterableDataset,
+        n_examples: int,
     ):
-        super().__init__(name, tokenizer, batch_size, dataset)
+        super().__init__(name, tokenizer, batch_size, dataset, n_examples)
         self.mlm_probability = mlm_probability
 
     def get_data_collator(self) -> Any:
@@ -126,8 +133,9 @@ class ClassificationDataset(TextDataset):
         sentence_keys: List[str],
         label_key: str,
         dataset: IterableDataset,
+        n_examples: int,
     ):
-        super().__init__(name, tokenizer, batch_size, dataset)
+        super().__init__(name, tokenizer, batch_size, dataset, n_examples)
         self.n_classes = n_classes
         self.sentence_keys = sentence_keys
         self.label_key = label_key

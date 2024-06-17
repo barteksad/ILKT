@@ -285,7 +285,7 @@ class TopNotchEvaluator:
         ):
             results = evaluator(self.sentence_transformer_model, output_path, epoch)
             for k, v in results.items():
-                wandb.log({f"{dataloader.dataset.name}/{k}": v})
+                wandb.log({f"{k}": v})
         self.other_processor.on_start(fabric)
         for batch, dataloader in self.other_dataloaders_iterator:
             self.other_processor(batch, dataloader, fabric)

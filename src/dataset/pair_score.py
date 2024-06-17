@@ -30,7 +30,7 @@ class PairScoreDataset(ContrastiveDataset):
             dataset = dataset.take(n_examples)
         self.max_length = max_length
         self.loss_fn = loss_fn
-        super().__init__(name, tokenizer, batch_size, dataset)
+        super().__init__(name, tokenizer, batch_size, dataset, n_examples)
 
     def _process_row(self, row: Any) -> Dict[str, Any]:
 

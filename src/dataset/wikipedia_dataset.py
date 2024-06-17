@@ -25,7 +25,9 @@ class WikipediaDataset(MLMDataset):
         if n_examples is not None:
             dataset = dataset.take(n_examples)
         self.max_length = max_length
-        super().__init__(name, tokenizer, batch_size, mlm_probability, dataset)
+        super().__init__(
+            name, tokenizer, batch_size, mlm_probability, dataset, n_examples
+        )
 
     def _process_row(self, row: Any) -> Dict[str, Any]:
         text = row["text"]

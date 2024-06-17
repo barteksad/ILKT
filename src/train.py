@@ -86,6 +86,7 @@ def main(config: DictConfig):
             train_batch_output = train_batch_processor(batch, dataloader, fabric)
             loss = train_batch_output.loss
             fabric.backward(loss)
+            fabric.clip_gradients(model, optimizer, max_norm=config.exp.max_grad_norm)
             optimizer.step()
             scheduler.step()
 
@@ -95,9 +96,9 @@ def main(config: DictConfig):
 
         # ----------------- validation -----------------
         if (current_step + 1) > NEXT_VALIDATION_STEP:
+            train_batch_processor.on_end(fabric)
             if fabric.is_global_zero:
                 log.info("Validation Step")
-                train_batch_processor.on_end(fabric)
                 model.eval()
                 epoch = current_step // config.exp.validate_every
                 with torch.inference_mode():
@@ -107,12 +108,12 @@ def main(config: DictConfig):
 
             NEXT_VALIDATION_STEP += config.exp.validate_every
 
-            if (current_step + 1) % config.exp.save_every == 0:
-                model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
-                tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
-                group, name = str(config.exp.log_dir).split("/")[-2:]
-                model.push_to_hub(f"ILKT/{group}_{name}")
-                tokenizer.push_to_hub(f"ILKT/{group}_{name}")
+            # if (current_step + 1) % config.exp.save_every == 0:
+            model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+            tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+            group, name = str(config.exp.log_dir).split("/")[-2:]
+            model.push_to_hub(f"ILKT/{group}_{name}")
+            tokenizer.push_to_hub(f"ILKT/{group}_{name}")
 
     if fabric.is_global_zero:
         model.save_pretrained(os.path.join(output_dir, "ILKTModel"))

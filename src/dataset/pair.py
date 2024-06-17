@@ -27,12 +27,11 @@ class PairDataset(ContrastiveDataset):
         dataset = dataset.shuffle(seed=42, buffer_size=10_000)
         if n_examples is not None:
             dataset = dataset.take(n_examples)
-            self.n_examples = n_examples
         self.max_length = max_length
         self.loss_fn = loss_fn
         self.query_column = query_column
         self.answer_column = answer_column
-        super().__init__(name, tokenizer, batch_size, dataset)
+        super().__init__(name, tokenizer, batch_size, dataset, n_examples)
 
     def _process_row(self, row: Any) -> Dict[str, Any]:
 

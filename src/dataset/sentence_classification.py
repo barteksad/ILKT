@@ -34,6 +34,7 @@ class SentenceClassificationDataset(ClassificationDataset):
             sentence_keys,
             label_key,
             dataset,
+            n_examples,
         )
 
     def _process_row(self, row: Any) -> Dict[str, Any]:

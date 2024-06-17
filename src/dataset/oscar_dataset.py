@@ -36,7 +36,9 @@ class OscarDataset(MLMDataset):
         self.n_examples = n_examples
         self.max_length = max_length
         self.text_column = text_column
-        super().__init__(name, tokenizer, batch_size, mlm_probability, dataset)
+        super().__init__(
+            name, tokenizer, batch_size, mlm_probability, dataset, n_examples
+        )
 
     def _process_row(self, row: Any) -> Dict[str, Any]:
         text = row[self.text_column]

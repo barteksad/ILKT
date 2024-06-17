@@ -2,7 +2,7 @@
 #SBATCH --partition common
 #SBATCH --qos=1gpu1d
 #SBATCH --gres=gpu:1
-#SBATCH --time 24:00:00
+#SBATCH --time 16:00:00
 #SBATCH --job-name=train
 #SBATCH --output=slurm_logs/train-%A.log
 
@@ -14,6 +14,8 @@ cd ~/ILKT
 source env/bin/activate
 
 wandb online
+
 export HYDRA_FULL_ERROR=1
 export TOKENIZERS_PARALLELISM=false
+
 srun python src/train.py

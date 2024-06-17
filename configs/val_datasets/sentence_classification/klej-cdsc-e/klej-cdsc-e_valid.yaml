@@ -4,7 +4,7 @@ split: "validation"
 n_classes: 3
 n_examples: ${exp.n_examples_per_valid_dataset}
 max_length: ${exp.max_length}
-batch_size: ${exp.batch_size}
+batch_size: ${exp.valid_batch_size}
 sentence_keys: 
   - "sentence_A"
   - "sentence_B"
