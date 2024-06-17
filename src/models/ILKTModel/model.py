@@ -102,7 +102,7 @@ class MLMHead(nn.Module):
                 prediction_scores.view(-1, prediction_scores.size(-1)),
                 labels.view(-1),
             )
-        return MaskedLMOutput(loss=loss)
+        return MaskedLMOutput(loss=loss, logits=prediction_scores)
 
 
 class CLSHead(nn.Module):
@@ -145,7 +145,7 @@ class CLSHead(nn.Module):
                 prediction_scores.view(-1, prediction_scores.size(-1)),
                 labels.view(-1),
             )
-        return SequenceClassifierOutput(loss=loss)
+        return SequenceClassifierOutput(loss=loss, logits=prediction_scores)
 
 
 class ForwardRouting(Enum):

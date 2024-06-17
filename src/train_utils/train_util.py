@@ -1,5 +1,7 @@
+from __future__ import annotations
 from abc import abstractmethod
 from collections import defaultdict
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -8,16 +10,13 @@ from typing import (
     NamedTuple,
     Optional,
     Tuple,
-    TypeVar,
     Union,
 )
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
 from lightning import Fabric
-
 from transformers import PreTrainedTokenizer
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.models import Normalize, Pooling
@@ -26,15 +25,9 @@ import wandb
 
 from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
 from models import ILKTModel, ForwardRouting
+from train_utils.data_iterator import FullValidIterator, DL_TYPE
 
 __all__ = ["create_optimizer_v2"]
-
-DL_TYPE = TypeVar(
-    "DL_TYPE",
-    DataLoader[ContrastiveDataset],
-    DataLoader[MLMDataset],
-    DataLoader[SentenceClassificationDataset],
-)
 
 
 # here we combine API for models and datasets, this is the only place where we need to know model and dataset spec
@@ -110,6 +103,31 @@ class LossProcessor(BatchProcessor):
         return {"loss": loss}
 
 
+class AccuracyProcessor(BatchProcessor):
+    def on_batch(
+        self,
+        model: ILKTModel,
+        batch: Dict[str, Any],
+        dataloader: DL_TYPE,
+        fabric: Fabric,
+    ) -> Dict[str, Any]:
+        with fabric.autocast():
+            if isinstance(dataloader.dataset, SentenceClassificationDataset):
+                logits = batch["model_outputs"].logits
+                labels = batch["labels"]
+                accuracy = (logits.argmax(dim=-1) == labels).float().mean()
+            elif isinstance(dataloader.dataset, MLMDataset):
+                logits = batch["model_outputs"].logits
+                labels = batch["labels"]
+                labels_mask = labels != -100
+                accuracy = (logits.argmax(dim=-1) == labels)[labels_mask].float().mean()
+            else:
+                raise NotImplementedError(
+                    f"Accuracy is not implemented for {type(dataloader.dataset)}"
+                )
+        return {"accuracy": accuracy}
+
+
 class MetricProcessor(BatchProcessor):
     def __init__(self, keys_to_track: List[str]):
         self.keys_to_track = keys_to_track
@@ -178,23 +196,29 @@ BatchProcessOutput = NamedTuple("BatchProcessOutput", [("loss", torch.Tensor)])
 
 
 class BatchProcessStrategy:
-    def __init__(self, model: ILKTModel, steps: List[BatchProcessor]):
+    def __init__(self, model: ILKTModel, steps: List[List[BatchProcessor]]):
         self.model = model
         self.steps = steps
 
     def on_start(self, fabric: Fabric):
-        for step in self.steps:
-            step.on_start(fabric)
+        for step_list in self.steps:
+            for step in step_list:
+                step.on_start(fabric)
 
     def on_end(self, fabric: Fabric):
-        for step in self.steps:
-            step.on_end(fabric)
+        for step_list in self.steps:
+            for step in step_list:
+                step.on_end(fabric)
 
     def __call__(
         self, batch: Dict[str, Any], dataloader: DL_TYPE, fabric: Fabric
     ) -> BatchProcessOutput:
-        for step in self.steps:
-            batch = step.on_batch(self.model, batch, dataloader, fabric)
+        for step_list in self.steps:
+            step_outputs = {}
+            for step in step_list:
+                step_output = step.on_batch(self.model, batch, dataloader, fabric)
+                step_outputs.update(step_output)
+            batch = step_outputs
         return BatchProcessOutput(loss=batch["loss"])
 
 
@@ -202,9 +226,9 @@ class TrainBatchProcessStrategy(BatchProcessStrategy):
     def __init__(self, model: ILKTModel, steps=None):
         if steps is None:
             steps = [
-                ModelOutputProcessor(),
-                LossProcessor(),
-                WandbMetricLogger("train", ["loss"], log_per_batch=True),
+                [ModelOutputProcessor()],
+                [LossProcessor()],
+                [WandbMetricLogger("train", ["loss"], log_per_batch=True)],
             ]  # W ten sposób przy każdym wykonaniu kosntruktora rtobisz nowe obiekty - znacznie mniej błędogenne
         super().__init__(model, steps)
 
@@ -217,12 +241,55 @@ class ValidationBatchProcessStrategy(BatchProcessStrategy):
     ):
         if steps is None:
             steps = [
-                ModelOutputProcessor(),
-                LossProcessor(),
-                MetricProcessor(["loss"]),
-                WandbMetricLogger("val", ["loss"], log_per_batch=False),
+                [ModelOutputProcessor()],
+                [LossProcessor(), AccuracyProcessor()],
+                [MetricProcessor(["loss", "accuracy"])],
+                [WandbMetricLogger("val", ["loss", "accuracy"], log_per_batch=False)],
             ]
         super().__init__(model, steps)
+
+
+class TopNotchEvaluator:
+    def __init__(
+        self,
+        model: ILKTModel,
+        tokenizer: PreTrainedTokenizer,
+        dataloaders: List[DL_TYPE],
+        output_dir: Path,
+    ):
+        self.sentence_transformer_model = custom_transformer2sentence_transformer(
+            tokenizer, model
+        )
+        self.contrastive_dataloaders = list(
+            filter(lambda x: isinstance(x.dataset, ContrastiveDataset), dataloaders)
+        )
+        self.contrastive_evaluators = [
+            dataloader.dataset.get_evaluator()
+            for dataloader in self.contrastive_dataloaders
+        ]
+        self.other_dataloaders_iterator = FullValidIterator(
+            list(
+                filter(
+                    lambda x: not isinstance(x.dataset, ContrastiveDataset), dataloaders
+                )
+            )
+        )
+        self.other_processor = ValidationBatchProcessStrategy(model)
+        self.output_dir = output_dir
+
+    def __call__(self, epoch: int, fabric: Fabric):
+        output_path = self.output_dir / f"eval_epoch_{epoch}"
+        output_path.mkdir(exist_ok=True, parents=True)
+        for dataloader, evaluator in zip(
+            self.contrastive_dataloaders, self.contrastive_evaluators
+        ):
+            results = evaluator(self.sentence_transformer_model, output_path, epoch)
+            for k, v in results.items():
+                wandb.log({f"{dataloader.dataset.name}/{k}": v})
+        self.other_processor.on_start(fabric)
+        for batch, dataloader in self.other_dataloaders_iterator:
+            self.other_processor(batch, dataloader, fabric)
+        self.other_processor.on_end(fabric)
 
 
 def custom_transformer2sentence_transformer(

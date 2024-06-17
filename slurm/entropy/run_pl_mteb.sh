@@ -17,6 +17,7 @@ wandb online
 
 source env/bin/activate
 cd ~/ILKT/benchmarks
+export TOKENIZERS_PARALLELISM=false
 
 srun python run_mteb_polish.py $MODEL_NAME
 # mteb create_meta --results_folder results/pl/2024-06-15_10-09-42/2024-06-15_10-09-42/df43a61cba85e74f7417fc57dfe8f5e2ce598dcf --output_path model_card.md

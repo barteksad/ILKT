@@ -36,7 +36,7 @@ exp:
   batch_size: 4
   seed: 42
   training_steps: 20_000
-  validate_every: 1
+  validate_every: 10
   n_examples_per_valid_dataset: 1000
   save_every: 1000
   optimizer:

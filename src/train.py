@@ -8,19 +8,18 @@ from hydra.utils import instantiate
 from lightning import Fabric
 from omegaconf import DictConfig
 from transformers import AutoTokenizer
-import wandb
 
 from train_utils.data_iterator import SingleBatchPerDatasetIterator
 from train_utils.dataset_loader import DatasetLoader
 from utils import extract_output_dir, preprocess_config, setup_wandb
 from train_utils.train_util import (
+    TopNotchEvaluator,
     TrainBatchProcessStrategy,
 )
 
-from dataset import ContrastiveDataset, SentenceClassificationDataset
+from dataset import SentenceClassificationDataset
 from train_utils.train_util import (
     create_optimizer_v2,
-    custom_transformer2sentence_transformer,
 )
 
 log = logging.getLogger(__name__)
@@ -64,8 +63,6 @@ def main(config: DictConfig):
     model.config.register_for_auto_class()
     model.register_for_auto_class("AutoModel")
 
-    st_model_wrapper = custom_transformer2sentence_transformer(tokenizer, model)
-
     TRAINING_STEPS = config.exp.training_steps
     NEXT_VALIDATION_STEP = config.exp.validate_every
 
@@ -75,6 +72,9 @@ def main(config: DictConfig):
     train_batch_processor.on_start(fabric)
 
     train_iterator = SingleBatchPerDatasetIterator(dataset_loader.train_dataloaders)
+    evaluator = TopNotchEvaluator(
+        model, tokenizer, dataset_loader.val_dataloaders, output_dir
+    )
 
     if fabric.is_global_zero:
         pbar = tqdm(total=TRAINING_STEPS, position=0, leave=True)
@@ -100,28 +100,8 @@ def main(config: DictConfig):
                 train_batch_processor.on_end(fabric)
                 model.eval()
                 epoch = current_step // config.exp.validate_every
-                output_path = output_dir / f"eval_epoch_{epoch}"
-                output_path.mkdir(parents=True, exist_ok=True)
-
-                for dataloader in dataset_loader.val_dataloaders:
-                    if isinstance(dataloader.dataset, ContrastiveDataset):
-                        evaluator = dataloader.dataset.get_evaluator()
-                        with torch.inference_mode():
-
-                            results = evaluator(
-                                st_model_wrapper,
-                                epoch=epoch,
-                                output_path=output_path.as_posix(),
-                            )
-                            print(results)
-                            for k, v in results.items():
-                                wandb.log({f"{dataloader.dataset.name}/{k}": v})
-
-                    else:
-                        y_true = []
-                        y_pred = []
-
-                        # for batch in dataloader:
+                with torch.inference_mode():
+                    evaluator(epoch, fabric)
 
             train_batch_processor.on_start(fabric)
 
