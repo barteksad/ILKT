@@ -55,8 +55,8 @@ model = SentenceTransformer(
 )
 
 
-# evaluation = MTEB(tasks=tasks, task_langs=["pl"])
-# evaluation.run(
-#     model,
-#     output_folder=f"results/pl/{model_id.split('/')[-1]}",  # batch_size=32
-# )
+evaluation = MTEB(tasks=tasks, task_langs=["pl"])
+evaluation.run(
+    model,
+    output_folder=f"results/pl/{model_id.split('/')[-1]}",  # batch_size=32
+)

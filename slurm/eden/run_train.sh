@@ -13,7 +13,6 @@ cat $script_path
 
 WANDB_MODE=online
 HYDRA_FULL_ERROR=1
-export TOKENIZERS_PARALLELISM=false
 
 source /etc/profile.d/slurm.sh
 source /mnt/evafs/groups/mi2lab/bsobieski/scripts/conda/import.sh
@@ -27,5 +26,6 @@ git config --global credential.helper store
 huggingface-cli login --token $HF_TOKEN
 wandb online
 export HYDRA_FULL_ERROR=1
+export TOKENIZERS_PARALLELISM=false
 
 srun python src/train.py --config-name train_config

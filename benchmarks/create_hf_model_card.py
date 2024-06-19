@@ -11,6 +11,21 @@ META_STRING = META_STRING.replace(
     "    metrics:\n    - type:",
 )
 
+META_STRING = (
+    """\
+pipeline_tag: sentence-similarity
+tags:
+  - sentence-transformers
+  - feature-extraction
+  - sentence-similarity
+  - mteb
+language:
+    - en
+    - pl
+"""
+    + META_STRING
+)
+
 url = create_repo(model_id, exist_ok=True)
 
 card = RepoCard(META_STRING, ignore_metadata_errors=True)

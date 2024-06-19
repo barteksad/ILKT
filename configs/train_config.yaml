@@ -27,6 +27,7 @@ defaults:
     - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
     - sentence_classification/klej-psc/klej-psc_valid.yaml
     - sentence_classification/klej-dyk/klej-dyk_valid.yaml
+    - sentence_classification/allegro-reviews/allegro-reviews.yaml
     - mlm/allegro-summarization-articles/allegro-summarization-articles.yaml
 
 exp:
@@ -36,8 +37,8 @@ exp:
   batch_size: 4
   valid_batch_size: 8
   seed: 42
-  training_steps: 40_000
-  validate_every: 1000
+  training_steps: 160_000
+  validate_every: 10_000
   n_examples_per_valid_dataset: 20_000
   save_every: 1000
   max_grad_norm: 1.0
@@ -49,7 +50,7 @@ exp:
     fused: true
   scheduler: # must be one of those: https://huggingface.co/docs/transformers/en/main_classes/optimizer_schedules#schedules
     _target_: transformers.get_cosine_schedule_with_warmup
-    num_warmup_steps: 500
+    num_warmup_steps: 1000
     num_training_steps: ${exp.training_steps}
     num_cycles: 0.5
 
