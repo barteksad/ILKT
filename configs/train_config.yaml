@@ -16,6 +16,7 @@ defaults:
     - sentence_classification/klej-cdsc-e/klej-cdsc-e.yaml
     - sentence_classification/klej-psc/klej-psc.yaml
     - sentence_classification/klej-dyk/klej-dyk.yaml
+    - mlm/oscar/oscar.yaml
     - mlm/allegro-summarization-articles/allegro-summarization-articles.yaml
     - mlm/polemo2-official/polemo2-official.yaml
     - mlm/polish-news/polish-news.yaml
@@ -33,9 +34,9 @@ exp:
   max_length: 128
   batch_size: 8
   seed: 42
-  training_steps: 100
-  n_examples: 100
-  n_examples_valid: 1
+  training_steps: 20_000
+  n_examples: 10_000
+  n_examples_valid: 1000
   validate_every: 1000
   save_every: 1000
   optimizer:
