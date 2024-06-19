@@ -13,6 +13,6 @@ bitsandbytes
 sentence_transformers
 sentencepiece
 mwparserfromhell
-huggingface_cli
+huggingface_hub[cli]
 pyarrow
 mteb==1.12.25
