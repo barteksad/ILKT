@@ -256,6 +256,7 @@ class TopNotchEvaluator:
         tokenizer: PreTrainedTokenizer,
         dataloaders: List[DL_TYPE],
         output_dir: Path,
+        log_dir: Path,
     ):
         self.sentence_transformer_model = custom_transformer2sentence_transformer(
             tokenizer, model
@@ -276,16 +277,30 @@ class TopNotchEvaluator:
         )
         self.other_processor = ValidationBatchProcessStrategy(model)
         self.output_dir = output_dir
+        self.best_score = float("-inf")
+        self.model = model
+        self.tokenizer = tokenizer
+        self.log_dir = log_dir
 
     def __call__(self, epoch: int, fabric: Fabric):
         output_path = self.output_dir / f"eval_epoch_{epoch}"
         output_path.mkdir(exist_ok=True, parents=True)
+        primary_metrics_val = []
         for dataloader, evaluator in zip(
             self.contrastive_dataloaders, self.contrastive_evaluators
         ):
             results = evaluator(self.sentence_transformer_model, output_path, epoch)
             for k, v in results.items():
                 wandb.log({f"{k}": v})
+            if dataloader.dataset.to_checkpoint_evaluation:
+                primary_metrics_val.append(results[evaluator.primary_metric])
+        mean_result = sum(primary_metrics_val)/len(primary_metrics_val)
+        wandb.log({f"mean_primary_metric": mean_result})
+        if mean_result > self.best_score:
+            self.best_score = mean_result
+            group, name = str(self.log_dir).split("/")[-2:]
+            self.model.push_to_hub(f"ILKT/{group}_{name}_best")
+            self.tokenizer.push_to_hub(f"ILKT/{group}_{name}_best")
         self.other_processor.on_start(fabric)
         for batch, dataloader in self.other_dataloaders_iterator:
             self.other_processor(batch, dataloader, fabric)

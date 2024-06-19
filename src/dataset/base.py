@@ -19,12 +19,14 @@ class TextDataset(ABC, IterableDataset):
         batch_size: int,
         dataset: IterableDataset,
         n_examples: int,
+        to_checkpoint_evaluation: bool = True,
     ):
         self.name = "--".join(name.split("/"))
         self.tokenizer = tokenizer
         self.batch_size = batch_size
         self.dataset = dataset
         self.n_examples = n_examples
+        self.to_checkpoint_evaluation = to_checkpoint_evaluation # for now always true, but we will change this
 
     def reset(self):
         self.ds_iter = iter(self.dataset)

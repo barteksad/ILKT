@@ -73,7 +73,7 @@ def main(config: DictConfig):
 
     train_iterator = SingleBatchPerDatasetIterator(dataset_loader.train_dataloaders)
     evaluator = TopNotchEvaluator(
-        model, tokenizer, dataset_loader.val_dataloaders, output_dir
+        model, tokenizer, dataset_loader.val_dataloaders, output_dir, config.exp.log_dir
     )
 
     if fabric.is_global_zero:
