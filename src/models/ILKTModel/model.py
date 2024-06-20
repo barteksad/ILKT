@@ -13,6 +13,12 @@ from enum import Enum
 
 from .config import ILKTConfig
 
+import sys, os
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+sys.path.append(parent_dir)
+from eval_utils.metrics import stiffness
+sys.path.pop(-1)
+
 
 def cls_pooling(last_hidden_state, attention_mask):
     return last_hidden_state[:, 0, :]
@@ -192,6 +198,8 @@ class ILKTModel(PreTrainedModel):
             )
         )
 
+        self.initiate_stiffness()
+
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -200,6 +208,7 @@ class ILKTModel(PreTrainedModel):
         forward_routing: ForwardRouting = ForwardRouting.GET_SENTENCE_EMBEDDING,
         **kwargs,
     ):
+        self.set_current_task(forward_routing)
         if forward_routing == ForwardRouting.GET_SENTENCE_EMBEDDING:
             return self.get_sentence_embedding(
                 input_ids, attention_mask, token_type_ids=token_type_ids
@@ -263,3 +272,33 @@ class ILKTModel(PreTrainedModel):
         )
 
         return cls_output
+
+    def set_current_task(self, task):
+        self.current_task = task
+
+    def initiate_stiffness(self):
+        self.log_gradients = False
+        self.backbone.encoder.layer[-1].register_full_backward_hook(self._backward_hook)
+        self.gradients = {}
+        self.current_task = None
+
+    def _backward_hook(self, module, grad_input, grad_output):
+        if self.log_gradients and self.current_task in self.gradients:
+            self.gradients[self.current_task].append(grad_input[0])
+        elif self.log_gradients:
+            self.gradients[self.current_task] = [grad_input[0]]
+
+    def get_stiffness(self):
+        # REMARK: make sure that you train on CLS and MLM tasks
+        values = {}
+        
+        for task1 in self.gradients:
+            for task2 in self.gradients:
+                if str(task1) > str(task2) and len(self.gradients[task1]) > 0 and len(self.gradients[task2]) > 0:
+                    values[f'{task1}x{task2}_cosine'] = stiffness(torch.cat(self.gradients[task1], dim=-2), torch.cat(self.gradients[task2], dim=-2), "cosine")
+                    values[f'{task1}x{task2}_sign'] = stiffness(torch.cat(self.gradients[task1], dim=-2), torch.cat(self.gradients[task2], dim=-2), "sign")
+        
+        for task in self.gradients:
+            del self.gradients[task][:]
+
+        return values

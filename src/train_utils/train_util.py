@@ -150,14 +150,20 @@ class WandbMetricLogger(BatchProcessor):
                 self.log(dataloader.dataset.name, key, batch[key])
         else:
             self.last_batch[dataloader.dataset.name] = batch["agg_metrics"]
+            if "stiffness" not in self.last_batch:
+                self.last_batch["stiffness"] = model.get_stiffness()
 
         return batch
 
     def on_end(self, fabric: Fabric):
         if not self.log_per_batch and fabric.is_global_zero:
             for dataset_name, metrics in self.last_batch.items():
-                for key in self.keys_to_track:
-                    self.log(dataset_name, key, metrics[key])
+                if dataset_name == "stiffness":
+                    for key in metrics:
+                        self.log(dataset_name, key, metrics[key])
+                else:
+                    for key in self.keys_to_track:
+                        self.log(dataset_name, key, metrics[key])
 
 
 BatchProcessOutput = NamedTuple("BatchProcessOutput", [("loss", torch.Tensor)])
