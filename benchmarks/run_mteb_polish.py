@@ -11,7 +11,6 @@ from sentence_transformers import SentenceTransformer, SentenceTransformerModelC
 from sentence_transformers.models import Normalize, Pooling, Transformer
 from mteb import MTEB
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("main")
 
@@ -39,7 +38,7 @@ transformer_model = Transformer(
     config_args={"trust_remote_code": True},
     model_args={"trust_remote_code": True},
     tokenizer_args={
-        "model_max_length": 256,
+        "model_max_length": 512,
     },
 )
 pooling = Pooling(transformer_model.get_word_embedding_dimension(), "cls")
@@ -57,6 +56,5 @@ model = SentenceTransformer(
 
 evaluation = MTEB(tasks=tasks, task_langs=["pl"])
 evaluation.run(
-    model,
-    output_folder=f"results/pl/{model_id.split('/')[-1]}",  # batch_size=32
+    model, output_folder=f"results/pl/{model_id.split('/')[-1]}", batch_size=32
 )

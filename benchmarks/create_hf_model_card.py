@@ -5,26 +5,6 @@ from huggingface_hub import RepoCard, create_repo
 model_id = sys.argv[1].strip()
 with open("./model_card.md", "r") as f:
     META_STRING = f.read()
-META_STRING = META_STRING.replace("metric", "metrics")
-META_STRING = META_STRING.replace(
-    "    metrics:\n      type:",
-    "    metrics:\n    - type:",
-)
-
-META_STRING = (
-    """\
-pipeline_tag: sentence-similarity
-tags:
-  - sentence-transformers
-  - feature-extraction
-  - sentence-similarity
-  - mteb
-language:
-    - en
-    - pl
-"""
-    + META_STRING
-)
 
 url = create_repo(model_id, exist_ok=True)
 
