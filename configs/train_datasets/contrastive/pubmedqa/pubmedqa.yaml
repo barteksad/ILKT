@@ -1,0 +1,13 @@
+_target_: dataset.TripletDataset
+name: "sentence-transformers/pubmedqa"
+split: "train"
+max_length: ${exp.max_length}
+batch_size: ${exp.batch_size}
+query_col_name: "anchor"
+positive_col_name: "positive"
+negative_col_name: "negative"
+subset: "triplet-all"
+loss_fn:
+  _target_: sentence_transformers.losses.TripletLoss
+  model:
+    _target_: torch.nn.Identity

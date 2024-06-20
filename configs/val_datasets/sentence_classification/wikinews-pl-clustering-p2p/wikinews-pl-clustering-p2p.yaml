@@ -1,0 +1,9 @@
+_target_: dataset.SentenceClassificationDataset
+name: "PL-MTEB/wikinews-pl-clustering-p2p"
+split: "test"
+n_classes: 9
+max_length: ${exp.max_length}
+batch_size: ${exp.batch_size}
+sentence_keys: 
+  - "sentences"
+label_key: "labels"

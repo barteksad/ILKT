@@ -1,0 +1,9 @@
+_target_: dataset.SentenceClassificationDataset
+name: "PL-MTEB/scifield"
+split: "train"
+n_classes: 5
+max_length: ${exp.max_length}
+batch_size: ${exp.batch_size}
+sentence_keys: 
+  - "text"
+label_key: "label"
