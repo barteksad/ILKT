@@ -28,10 +28,12 @@ torch.set_float32_matmul_precision("high")
 
 
 def get_fabric(config) -> Fabric:
-    # if torch.cuda.is_bf16_supported():
-    #     fabric = instantiate(config.fabric, precision="bf16-mixed")
-    # else:
-    fabric = instantiate(config.fabric)
+    if torch.cuda.is_bf16_supported():
+        log.info("USING BF16-MIXED")
+        fabric = instantiate(config.fabric, precision="bf16-mixed")
+    else:
+        log.info("USING FP32")
+        fabric = instantiate(config.fabric)
     fabric.seed_everything(config.exp.seed)
     fabric.launch()
     return fabric

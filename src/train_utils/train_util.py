@@ -20,6 +20,7 @@ from lightning import Fabric
 from transformers import PreTrainedTokenizer
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.models import Normalize, Pooling
+import bitsandbytes as bnb
 
 import wandb
 
@@ -456,6 +457,8 @@ def create_optimizer_v2(
         optimizer = optim.AdamW(parameters, **opt_args)
     elif opt_lower == "sgd":
         optimizer = optim.SGD(parameters, momentum=momentum, **opt_args)
+    elif opt_lower == 'bnbadamw8bit':
+        optimizer = bnb.optim.AdamW8bit(parameters, **opt_args)
     else:
         raise NotImplementedError(f"Optimizer {opt} not implemented")
 
