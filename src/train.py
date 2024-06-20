@@ -111,7 +111,6 @@ def main(config: DictConfig):
                 model.eval()
                 epoch = current_step // config.exp.validate_every
                 with torch.inference_mode():
-                    _ = val_batch_processor(batch, dataloader, fabric)
                     evaluator(epoch, fabric)
             
             val_batch_processor.on_end(fabric)
