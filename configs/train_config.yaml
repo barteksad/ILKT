@@ -23,6 +23,7 @@ defaults:
     # - mlm/wikipedia-pl/wikipedia-pl.yaml
 
   - val_datasets:
+    - contrastive/all-nli/all-nli-pair-score.yaml
     - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
     - sentence_classification/klej-psc/klej-psc_valid.yaml
     - sentence_classification/klej-dyk/klej-dyk_valid.yaml
@@ -30,20 +31,28 @@ defaults:
 
 exp:
   log_dir: # set during runtime to automatically created dir
-  pretrained_model_name_or_path: microsoft/mdeberta-v3-base
-  max_length: 128
-  batch_size: 8
+  pretrained_model_name_or_path: google-bert/bert-base-multilingual-cased
+  max_length: 512
+  batch_size: 32
+  valid_batch_size: 32
   seed: 42
-  training_steps: 20_000
-  n_examples: 10_000
-  n_examples_valid: 1000
-  validate_every: 1000
-  save_every: 1000
+  training_steps: 1_000_000
+  validate_every: 100_000
+  n_examples_per_valid_dataset: 20_000
+  save_every: 100_000
+  max_grad_norm: 1.0
   optimizer:
-    opt: "adamw"
+    # opt: "adamw"
+    opt: "bnbadamw8bit"
     lr: 5e-5
     weight_decay: 0.0
     filter_bias_and_bn: true
+    # fused: true
+  scheduler: # must be one of those: https://huggingface.co/docs/transformers/en/main_classes/optimizer_schedules#schedules
+    _target_: transformers.get_cosine_schedule_with_warmup
+    num_warmup_steps: 1000
+    num_training_steps: ${exp.training_steps}
+    num_cycles: 0.5
 
 fabric:
   _target_: lightning.Fabric

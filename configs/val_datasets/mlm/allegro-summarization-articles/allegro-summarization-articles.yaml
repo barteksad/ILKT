@@ -2,8 +2,8 @@ _target_: dataset.OscarDataset
 name: "allegro/summarization-allegro-articles"
 language: ""
 split: "validation"
-n_examples: ${exp.n_examples}
+n_examples: ${exp.n_examples_per_valid_dataset}
 max_length: ${exp.max_length}
 mlm_probability: 0.15
-batch_size: ${exp.batch_size}
+batch_size: ${exp.valid_batch_size}
 text_column: "source"

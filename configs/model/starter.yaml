@@ -7,7 +7,7 @@ config:
   embedding_head_config:
     pool_type: "cls"
     normalize_embeddings: false
-    n_dense: 0
+    n_dense: 1
     use_batch_norm: false
     use_layer_norm: false
     dropout: 0.0
@@ -23,3 +23,4 @@ config:
     use_layer_norm: false
     dropout: 0.0
   cls_heads: []
+  max_length: ${exp.max_length}
