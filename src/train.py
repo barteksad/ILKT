@@ -83,7 +83,7 @@ def main(config: DictConfig):
     while current_step < TRAINING_STEPS:
         
         # ----------------- stiffness logging -----------------
-        if (current_step + 1) % config.exp.validate_every == 0:
+        if (current_step + 1) > NEXT_VALIDATION_STEP:
             model.log_gradients = True
         else:
             model.log_gradients = False
