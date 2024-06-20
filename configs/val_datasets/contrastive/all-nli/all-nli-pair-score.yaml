@@ -1,10 +1,10 @@
 _target_: dataset.PairScoreDataset
 name: "sentence-transformers/all-nli"
 split: "dev"
-n_examples: ${exp.n_examples}
+n_examples: ${exp.n_examples_per_valid_dataset}
 max_length: ${exp.max_length}
-batch_size: ${exp.batch_size}
+batch_size: ${exp.valid_batch_size}
 loss_fn:
-  _target_: sentence_transformers.losses.CosineSimilarityLoss
+  _target_: sentence_transformers.losses.CoSENTLoss
   model:
     _target_: torch.nn.Identity

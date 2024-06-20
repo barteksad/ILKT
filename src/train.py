@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import List
 
 import hydra
 import torch
@@ -8,18 +7,20 @@ from tqdm.auto import tqdm
 from hydra.utils import instantiate
 from lightning import Fabric
 from omegaconf import DictConfig
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoTokenizer
 
-from train_utils.data_iterator import SingleBatchPerDatasetIterator, FullValidIterator
+from train_utils.data_iterator import SingleBatchPerDatasetIterator
 from train_utils.dataset_loader import DatasetLoader
 from utils import extract_output_dir, preprocess_config, setup_wandb
 from train_utils.train_util import (
+    TopNotchEvaluator,
     TrainBatchProcessStrategy,
-    ValidationBatchProcessStrategy,
 )
 
-from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
-from train_utils.train_util import create_optimizer_v2
+from dataset import SentenceClassificationDataset
+from train_utils.train_util import (
+    create_optimizer_v2,
+)
 
 log = logging.getLogger(__name__)
 
@@ -27,10 +28,12 @@ torch.set_float32_matmul_precision("high")
 
 
 def get_fabric(config) -> Fabric:
-    # if torch.cuda.is_bf16_supported():
-    #     fabric = instantiate(config.fabric, precision="bf16-mixed")
-    # else:
-    fabric = instantiate(config.fabric)
+    if torch.cuda.is_bf16_supported():
+        log.info("USING BF16-MIXED")
+        fabric = instantiate(config.fabric, precision="bf16-mixed")
+    else:
+        log.info("USING FP32")
+        fabric = instantiate(config.fabric)
     fabric.seed_everything(config.exp.seed)
     fabric.launch()
     return fabric
@@ -53,23 +56,27 @@ def main(config: DictConfig):
             cls_heads.append((dataloader.dataset.n_classes, dataloader.dataset.name))
 
     config.model.config["cls_heads"] = cls_heads
-    model = instantiate(config.model, _convert_="all")
+    with fabric.init_module():
+        model = instantiate(config.model, _convert_="all")
     optimizer = create_optimizer_v2(model, **config.exp.optimizer)
+    scheduler = instantiate(config.exp.scheduler, optimizer=optimizer)
     model, optimizer = fabric.setup(model, optimizer)
 
     model.config.register_for_auto_class()
     model.register_for_auto_class("AutoModel")
 
     TRAINING_STEPS = config.exp.training_steps
+    NEXT_VALIDATION_STEP = config.exp.validate_every
 
     current_step = 0
 
     train_batch_processor = TrainBatchProcessStrategy(model)
     train_batch_processor.on_start(fabric)
-    val_batch_processor = ValidationBatchProcessStrategy(model)
 
     train_iterator = SingleBatchPerDatasetIterator(dataset_loader.train_dataloaders)
-    valid_iterator = FullValidIterator(dataset_loader.val_dataloaders)
+    evaluator = TopNotchEvaluator(
+        model, tokenizer, dataset_loader.val_dataloaders, output_dir
+    )
 
     if fabric.is_global_zero:
         pbar = tqdm(total=TRAINING_STEPS, position=0, leave=True)
@@ -81,30 +88,34 @@ def main(config: DictConfig):
             train_batch_output = train_batch_processor(batch, dataloader, fabric)
             loss = train_batch_output.loss
             fabric.backward(loss)
+            fabric.clip_gradients(model, optimizer, max_norm=config.exp.max_grad_norm)
             optimizer.step()
+            scheduler.step()
+
+            current_step += 1
+            if fabric.is_global_zero:
+                pbar.update(1)
 
         # ----------------- validation -----------------
-        if (current_step + 1) % config.exp.validate_every == 0:
+        if (current_step + 1) > NEXT_VALIDATION_STEP:
             train_batch_processor.on_end(fabric)
-            val_batch_processor.on_start(fabric)
-            model.eval()
-            for batch, dataloader in valid_iterator:
+            if fabric.is_global_zero:
+                log.info("Validation Step")
+                model.eval()
+                epoch = current_step // config.exp.validate_every
                 with torch.inference_mode():
-                    _ = val_batch_processor(batch, dataloader, fabric)
+                    evaluator(epoch, fabric)
 
-            val_batch_processor.on_end(fabric)
             train_batch_processor.on_start(fabric)
 
-        current_step += 1
-        if fabric.is_global_zero:
-            pbar.update(1)
+            NEXT_VALIDATION_STEP += config.exp.validate_every
 
-            if (current_step + 1) % config.exp.save_every == 0:
-                model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
-                tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
-                group, name = str(config.exp.log_dir).split("/")[-2:]
-                model.push_to_hub(f"ILKT/{group}_{name}")
-                tokenizer.push_to_hub(f"ILKT/{group}_{name}")
+            # if (current_step + 1) % config.exp.save_every == 0:
+            model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+            tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+            group, name = str(config.exp.log_dir).split("/")[-2:]
+            model.push_to_hub(f"ILKT/{group}_{name}")
+            tokenizer.push_to_hub(f"ILKT/{group}_{name}")
 
     if fabric.is_global_zero:
         model.save_pretrained(os.path.join(output_dir, "ILKTModel"))

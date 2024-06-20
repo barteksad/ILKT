@@ -26,5 +26,6 @@ git config --global credential.helper store
 huggingface-cli login --token $HF_TOKEN
 wandb online
 export HYDRA_FULL_ERROR=1
+export TOKENIZERS_PARALLELISM=false
 
 srun python src/train.py --config-name train_config

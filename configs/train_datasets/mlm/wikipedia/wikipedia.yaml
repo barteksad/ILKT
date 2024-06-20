@@ -3,7 +3,6 @@ name: "wikipedia"
 language: "pl"
 date: "20240201"
 split: "train"
-n_examples: ${exp.n_examples}
 max_length: ${exp.max_length}
 mlm_probability: 0.15
 batch_size: ${exp.batch_size}

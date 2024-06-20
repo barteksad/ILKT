@@ -1,6 +1,14 @@
-from typing import List, Iterable
+from typing import List, Iterable, TypeVar
+from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
+from torch.utils.data import DataLoader
 
-from train_utils.train_util import DL_TYPE
+
+DL_TYPE = TypeVar(
+    "DL_TYPE",
+    DataLoader[ContrastiveDataset],
+    DataLoader[MLMDataset],
+    DataLoader[SentenceClassificationDataset],
+)
 
 
 class DataIterator(Iterable):

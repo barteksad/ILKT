@@ -1,9 +1,14 @@
 import torch
 from datasets import load_dataset
 from transformers import DataCollatorWithPadding, PreTrainedTokenizer
-from typing import Any, Dict
+from sentence_transformers.evaluation import (
+    EmbeddingSimilarityEvaluator,
+    SimilarityFunction,
+)
+from typing import Any, Dict, Optional
 
 from .base import ContrastiveDataset
+
 
 class PairScoreDataset(ContrastiveDataset):
 
@@ -11,34 +16,23 @@ class PairScoreDataset(ContrastiveDataset):
         self,
         name: str,
         split: str,
-        n_examples: int,
         tokenizer: PreTrainedTokenizer,
         batch_size: int,
         max_length: int,
         loss_fn: torch.nn.Module,
         type: str = "pair-score",
-        **kwargs
+        n_examples: Optional[int] = None,
+        **kwargs,
     ):
-        super().__init__(name, tokenizer, batch_size)
-
-        self.dataset = load_dataset(name, type, split=split, streaming=True)
-        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)  # type: ignore
-        self.n_examples = n_examples
+        dataset = load_dataset(name, type, split=split, streaming=True)
+        dataset = dataset.shuffle(seed=42, buffer_size=10_000)  # type: ignore
+        if n_examples is not None:
+            dataset = dataset.take(n_examples)
         self.max_length = max_length
         self.loss_fn = loss_fn
-        
-    def reset(self):
-        self.dataset = self.dataset.shuffle(seed=42, buffer_size=10_000)
-        self.ds_iter = iter(self.dataset)
+        super().__init__(name, tokenizer, batch_size, dataset, n_examples)
 
-    def __len__(self) -> int:
-        return self.n_examples
-
-    def __getitem__(self, idx: int):
-        if idx == 0:
-            self.reset()
-
-        row = next(self.ds_iter)
+    def _process_row(self, row: Any) -> Dict[str, Any]:
 
         sentence1 = self.tokenizer(
             row["sentence1"], truncation=True, max_length=self.max_length
@@ -73,3 +67,12 @@ class PairScoreDataset(ContrastiveDataset):
         ]
 
         return self.loss_fn(sentence_features, labels)
+
+    def get_evaluator(self):
+        return EmbeddingSimilarityEvaluator(
+            sentences1=[i["sentence1"] for i in self.dataset],
+            sentences2=[i["sentence2"] for i in self.dataset],
+            scores=[i["score"] for i in self.dataset],
+            main_similarity=SimilarityFunction.COSINE,
+            name=self.name,
+        )

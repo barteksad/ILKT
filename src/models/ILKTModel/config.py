@@ -14,6 +14,7 @@ class ILKTConfig(PretrainedConfig):
         mlm_head_config: Dict[str, Any] = {},
         cls_head_config: Dict[str, Any] = {},
         cls_heads: List[Tuple[int, str]] = [],
+        max_length: int = 512,
         **kwargs
     ):
         self.backbone_config = backbone_config
@@ -21,6 +22,7 @@ class ILKTConfig(PretrainedConfig):
         self.mlm_head_config = mlm_head_config
         self.cls_head_config = cls_head_config
         self.cls_heads = cls_heads
+        self.max_length = False
         self.output_hidden_states = False
 
         # TODO:
