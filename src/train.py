@@ -113,24 +113,15 @@ def main(config: DictConfig):
                 with torch.inference_mode():
                     evaluator(epoch, fabric)
             
-            val_batch_processor.on_end(fabric)
             train_batch_processor.on_start(fabric)
 
             NEXT_VALIDATION_STEP += config.exp.validate_every
 
-            # if (current_step + 1) % config.exp.save_every == 0:
             model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
             tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
             group, name = str(config.exp.log_dir).split("/")[-2:]
             model.push_to_hub(f"ILKT/{group}_{name}")
             tokenizer.push_to_hub(f"ILKT/{group}_{name}")
-
-    if fabric.is_global_zero:
-        model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
-        tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
-        group, name = str(config.exp.log_dir).split("/")[-2:]
-        model.push_to_hub(f"ILKT/{group}_{name}")
-        tokenizer.push_to_hub(f"ILKT/{group}_{name}")
 
 
 if __name__ == "__main__":
