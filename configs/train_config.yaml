@@ -4,27 +4,27 @@ defaults:
   - _self_
   - model: starter
   - train_datasets:
-    # - contrastive/all-nli/all-nli-pair-score.yaml
-    # - contrastive/eli5/eli5.yaml
-    # - contrastive/coliee/coliee.yaml
+    - contrastive/all-nli/all-nli-pair-score.yaml
+    - contrastive/eli5/eli5.yaml
+    - contrastive/coliee/coliee.yaml
     - contrastive/pubmedqa/pubmedqa.yaml
     - contrastive/hotpotqa/hotpotqa.yaml
-    # - contrastive/gooaq/gooaq.yaml
-    # - contrastive/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1.yaml
-    # - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
-    # - contrastive/natural-questions/natural-questions.yaml
-    # - contrastive/quora-duplicates/quora-duplicates.yaml
-    # - contrastive/squad/squad.yaml
-    # - contrastive/stsb/stsb.yaml
-    # - contrastive/yahoo-answers/yahoo-answers.yaml
-    # - sentence_classification/klej-cdsc-e/klej-cdsc-e.yaml
-    # - sentence_classification/klej-psc/klej-psc.yaml
-    # - sentence_classification/klej-dyk/klej-dyk.yaml
+    - contrastive/gooaq/gooaq.yaml
+    - contrastive/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1.yaml
+    - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
+    - contrastive/natural-questions/natural-questions.yaml
+    - contrastive/quora-duplicates/quora-duplicates.yaml
+    - contrastive/squad/squad.yaml
+    - contrastive/stsb/stsb.yaml
+    - contrastive/yahoo-answers/yahoo-answers.yaml
+    - sentence_classification/klej-cdsc-e/klej-cdsc-e.yaml
+    - sentence_classification/klej-psc/klej-psc.yaml
+    - sentence_classification/klej-dyk/klej-dyk.yaml
     - sentence_classification/scifield/scifield.yaml
-    # - mlm/oscar/oscar.yaml
-    # - mlm/allegro-summarization-articles/allegro-summarization-articles.yaml
-    # - mlm/polemo2-official/polemo2-official.yaml
-    # - mlm/polish-news/polish-news.yaml
+    - mlm/oscar/oscar.yaml
+    - mlm/allegro-summarization-articles/allegro-summarization-articles.yaml
+    - mlm/polemo2-official/polemo2-official.yaml
+    - mlm/polish-news/polish-news.yaml
     # - mlm/wikipedia-pl/wikipedia-pl.yaml
    
 
@@ -33,8 +33,8 @@ defaults:
     # - sentence_classification/klej-cdsc-e/klej-cdsc-e_valid.yaml
     # - sentence_classification/klej-psc/klej-psc_valid.yaml
     # - sentence_classification/klej-dyk/klej-dyk_valid.yaml
-    - sentence_classification/scifield/scifield.yaml
-    - sentence_classification/wikinews-pl-clustering-p2p/wikinews-pl-clustering-p2p.yaml
+    # - sentence_classification/scifield/scifield.yaml
+    # - sentence_classification/wikinews-pl-clustering-p2p/wikinews-pl-clustering-p2p.yaml
     # - mlm/allegro-summarization-articles/allegro-summarization-articles.yaml
 
 exp:
@@ -44,10 +44,12 @@ exp:
   batch_size: 4
   valid_batch_size: 4
   seed: 42
-  training_steps: 1_0
-  validate_every: 5
+  training_steps: 1000
+  validate_every: 100
   n_examples_per_valid_dataset: 10
   save_every: 100_000
+  monitor_stiffness_every: 50
+  monitor_stiffness_steps: 20
   max_grad_norm: 1.0
   optimizer:
     # opt: "adamw"

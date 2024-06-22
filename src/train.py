@@ -70,7 +70,11 @@ def main(config: DictConfig):
 
     current_step = 0
 
-    train_batch_processor = TrainBatchProcessStrategy(model)
+    train_batch_processor = TrainBatchProcessStrategy(
+        model,
+        monitor_stiffness_every=config.exp.monitor_stiffness_every,
+        monitor_stiffness_steps=config.exp.monitor_stiffness_steps,
+    )
     train_batch_processor.on_start(fabric)
 
     train_iterator = SingleBatchPerDatasetIterator(dataset_loader.train_dataloaders)
@@ -81,7 +85,7 @@ def main(config: DictConfig):
     if fabric.is_global_zero:
         pbar = tqdm(total=TRAINING_STEPS, position=0, leave=True)
     while current_step < TRAINING_STEPS:
-        
+
         # ----------------- stiffness logging -----------------
         if (current_step + 1) > NEXT_VALIDATION_STEP:
             model.log_gradients = True
@@ -112,7 +116,7 @@ def main(config: DictConfig):
                 epoch = current_step // config.exp.validate_every
                 with torch.inference_mode():
                     evaluator(epoch, fabric)
-            
+
             train_batch_processor.on_start(fabric)
 
             NEXT_VALIDATION_STEP += config.exp.validate_every

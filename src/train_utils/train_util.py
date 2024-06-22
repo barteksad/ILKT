@@ -21,7 +21,7 @@ from transformers import PreTrainedTokenizer
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.models import Normalize, Pooling
 import bitsandbytes as bnb
-
+from .metrics import stiffness
 import wandb
 
 from dataset import ContrastiveDataset, MLMDataset, SentenceClassificationDataset
@@ -48,6 +48,73 @@ class BatchProcessor:
         fabric: Fabric,
     ) -> Dict[str, Any]:
         pass
+
+
+class StiffnessMonitor(BatchProcessor):
+    def __init__(self, monitor_stiffness_every: int, monitor_stiffness_steps: int):
+        self.monitor_stiffness_every = monitor_stiffness_every
+        self.monitor_stiffness_steps = monitor_stiffness_steps
+        self.steps = 0
+        self.gradients = defaultdict(list)
+        self.hook = None
+
+    def on_batch(
+        self,
+        model: ILKTModel,
+        batch: Dict[str, Any],
+        dataloader: DL_TYPE,
+        fabric: Fabric,
+    ) -> Dict[str, Any]:
+
+        self.steps += 1
+
+        if self.hook is not None:
+            self.hook.remove()
+            self.hook = None
+
+        metric_dict = {"stiffness": {}}
+
+        if self.steps % self.monitor_stiffness_every < self.monitor_stiffness_steps:
+            if isinstance(dataloader.dataset, ContrastiveDataset):
+                task_type = ForwardRouting.GET_SENTENCE_EMBEDDING
+            elif isinstance(dataloader.dataset, SentenceClassificationDataset):
+                task_type = ForwardRouting.GET_CLS_OUTPUT
+            elif isinstance(dataloader.dataset, MLMDataset):
+                task_type = ForwardRouting.GET_MLM_OUTPUT
+            else:
+                raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
+
+            def backward_hook(module, grad_input, grad_output):
+
+                self.gradients[task_type].append(
+                    grad_output[0][:, 0, :].detach().cpu()
+                )
+
+            self.hook = model.backbone.encoder.layer[-1].register_full_backward_hook(
+                backward_hook
+            )
+        elif len(self.gradients.items()) > 1:
+            for task, gradients in self.gradients.items():
+                self.gradients[task] = torch.stack(gradients).mean(dim=0)
+
+            for task1 in self.gradients:
+                for task2 in self.gradients:
+                    if str(task1) > str(task2):
+                        metric_dict[f"{task1}x{task2}_cosine"] = stiffness(
+                            self.gradients[task1],
+                            self.gradients[task2],
+                            "cosine",
+                        )
+            self.gradients = defaultdict(list)
+            metric_dict = {"stiffness": metric_dict}
+            print(metric_dict)
+
+        return metric_dict
+
+    def on_end(self, fabric: Fabric):
+        if self.hook is not None:
+            self.hook.remove()
+            self.hook = None
 
 
 class ModelOutputProcessor(BatchProcessor):
@@ -180,23 +247,21 @@ class WandbMetricLogger(BatchProcessor):
     ) -> Dict[str, Any]:
         if self.log_per_batch and fabric.is_global_zero:
             for key in self.keys_to_track:
-                self.log(dataloader.dataset.name, key, batch[key])
+                if key == "stiffness" and key in batch:
+                    for k, v in batch[key].items():
+                        self.log("stiffness", k, v)
+                else:
+                    self.log(dataloader.dataset.name, key, batch[key])
         else:
             self.last_batch[dataloader.dataset.name] = batch["agg_metrics"]
-            if "stiffness" not in self.last_batch:
-                self.last_batch["stiffness"] = model.get_stiffness()
 
         return batch
 
     def on_end(self, fabric: Fabric):
         if not self.log_per_batch and fabric.is_global_zero:
             for dataset_name, metrics in self.last_batch.items():
-                if dataset_name == "stiffness":
-                    for key in metrics:
-                        self.log(dataset_name, key, metrics[key])
-                else:
-                    for key in self.keys_to_track:
-                        self.log(dataset_name, key, metrics[key])
+                for key in self.keys_to_track:
+                    self.log(dataset_name, key, metrics[key])
 
 
 BatchProcessOutput = NamedTuple("BatchProcessOutput", [("loss", torch.Tensor)])
@@ -230,12 +295,31 @@ class BatchProcessStrategy:
 
 
 class TrainBatchProcessStrategy(BatchProcessStrategy):
-    def __init__(self, model: ILKTModel, steps=None):
+
+    def __init__(
+        self,
+        model: ILKTModel,
+        monitor_stiffness_every: int,
+        monitor_stiffness_steps: int,
+        steps=None,
+    ):
         if steps is None:
             steps = [
                 [ModelOutputProcessor()],
-                [LossProcessor()],
-                [WandbMetricLogger("train", ["loss"], log_per_batch=True)],
+                [
+                    LossProcessor(),
+                    StiffnessMonitor(monitor_stiffness_every, monitor_stiffness_steps),
+                ],
+                [
+                    WandbMetricLogger(
+                        "train",
+                        [
+                            "loss",
+                            "stiffness",
+                        ],
+                        log_per_batch=True,
+                    )
+                ],
             ]  # W ten sposób przy każdym wykonaniu kosntruktora rtobisz nowe obiekty - znacznie mniej błędogenne
         super().__init__(model, steps)
 
@@ -463,7 +547,7 @@ def create_optimizer_v2(
         optimizer = optim.AdamW(parameters, **opt_args)
     elif opt_lower == "sgd":
         optimizer = optim.SGD(parameters, momentum=momentum, **opt_args)
-    elif opt_lower == 'bnbadamw8bit':
+    elif opt_lower == "bnbadamw8bit":
         optimizer = bnb.optim.AdamW8bit(parameters, **opt_args)
     else:
         raise NotImplementedError(f"Optimizer {opt} not implemented")
