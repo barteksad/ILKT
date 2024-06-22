@@ -2,7 +2,7 @@ _target_: dataset.PairScoreDataset
 name: "sentence-transformers/stsb"
 split: "train"
 max_length: ${exp.max_length}
-batch_size: ${exp.batch_size}
+batch_size: ${exp.contrastive_batch_size}
 type: "default"
 loss_fn:
   _target_: sentence_transformers.losses.CoSENTLoss

@@ -2,7 +2,7 @@ _target_: dataset.PairDataset
 name: "sentence-transformers/yahoo-answers"
 split: "train"
 max_length: ${exp.max_length}
-batch_size: ${exp.batch_size}
+batch_size: ${exp.contrastive_batch_size}
 query_column: "question"
 answer_column: "answer"
 subset: "title-question-answer-pair"
