@@ -60,6 +60,7 @@ class SentenceEmbeddingHead(nn.Module):
             raise NotImplementedError(
                 f"Pooling type {self.config['pool_type']} not implemented"
             )
+        embeddings = self.head(embeddings)
         if self.config["normalize_embeddings"]:
             embeddings = nn.functional.normalize(embeddings, p=2, dim=-1)
         return BaseModelOutputWithPooling(

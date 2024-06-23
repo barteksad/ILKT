@@ -5,6 +5,10 @@ defaults:
   - model: starter
   - train_datasets:
     - contrastive/all-nli/all-nli-pair-score.yaml
+    - contrastive/eli5/eli5.yaml
+    - contrastive/coliee/coliee.yaml
+    - contrastive/pubmedqa/pubmedqa.yaml
+    - contrastive/hotpotqa/hotpotqa.yaml
     - contrastive/gooaq/gooaq.yaml
     - contrastive/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1/msmarco-distilbert-margin-mse-sym-mnrl-mean-v1.yaml
     - contrastive/msmarco-msmarco-distilbert-base-tas-b/msmarco-msmarco-distilbert-base-tas-b-triplet.yaml
@@ -26,10 +30,12 @@ exp:
   valid_batch_size: 32
   seed: 42
   training_steps: 1_000_000
-  validate_every: 100_000
+  validate_every: 30_000
   n_examples_per_valid_dataset: 20_000
   save_every: 100_000
   max_grad_norm: 1.0
+  monitor_stiffness_every: 10_000
+  monitor_stiffness_steps: 100
   optimizer:
     # opt: "adamw"
     opt: "bnbadamw8bit"

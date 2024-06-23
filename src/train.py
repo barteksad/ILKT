@@ -110,10 +110,10 @@ def main(config: DictConfig):
         # ----------------- validation -----------------
         if (current_step + 1) > NEXT_VALIDATION_STEP:
             train_batch_processor.on_end(fabric)
+            epoch = current_step // config.exp.validate_every
             if fabric.is_global_zero:
                 log.info("Validation Step")
                 model.eval()
-                epoch = current_step // config.exp.validate_every
                 with torch.inference_mode():
                     evaluator(epoch, fabric)
 
@@ -124,8 +124,14 @@ def main(config: DictConfig):
             model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
             tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
             group, name = str(config.exp.log_dir).split("/")[-2:]
-            model.push_to_hub(f"ILKT/{group}_{name}")
-            tokenizer.push_to_hub(f"ILKT/{group}_{name}")
+            model.push_to_hub(f"ILKT/{group}_{name}_epoch_{epoch}")
+            tokenizer.push_to_hub(f"ILKT/{group}_{name}_epoch_{epoch}")
+
+    model.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+    tokenizer.save_pretrained(os.path.join(output_dir, "ILKTModel"))
+    group, name = str(config.exp.log_dir).split("/")[-2:]
+    model.push_to_hub(f"ILKT/{group}_{name}_last")
+    tokenizer.push_to_hub(f"ILKT/{group}_{name}_last")
 
 
 if __name__ == "__main__":

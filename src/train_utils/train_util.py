@@ -95,7 +95,7 @@ class StiffnessMonitor(BatchProcessor):
             )
         elif len(self.gradients.items()) > 1:
             for task, gradients in self.gradients.items():
-                self.gradients[task] = torch.stack(gradients).mean(dim=0)
+                self.gradients[task] = torch.cat(gradients).mean(dim=0)
 
             for task1 in self.gradients:
                 for task2 in self.gradients:
