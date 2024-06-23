@@ -10,8 +10,8 @@
 script_path=$(readlink -f "$0")
 cat $script_path
 
-MODEL_NAME="ILKT/2024-06-20_12-31-59"
-MODEL_NAME_NO_ORG="2024-06-20_12-31-59"
+MODEL_NAME="ILKT/2024-06-22_12-37-29_epoch_13"
+MODEL_NAME_NO_ORG="2024-06-22_12-37-29_epoch_13"
 
 wandb online
 
