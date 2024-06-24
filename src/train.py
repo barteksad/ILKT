@@ -100,7 +100,10 @@ def main(config: DictConfig):
             train_batch_output = train_batch_processor(batch, dataloader, fabric)
             loss = train_batch_output.loss
             fabric.backward(loss)
-            fabric.clip_gradients(model, optimizer, max_norm=config.exp.max_grad_norm)
+            beta = 1.0
+            if not isinstance(dataloader.dataset, ContrastiveDataset):
+                beta = config.exp.beta
+            fabric.clip_gradients(model, optimizer, max_norm=config.exp.max_grad_norm*beta)
             optimizer.step()
             scheduler.step()
 
