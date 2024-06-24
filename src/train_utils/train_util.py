@@ -338,7 +338,7 @@ class ValidationBatchProcessStrategy(BatchProcessStrategy):
         if steps is None:
             steps = [
                 [ModelOutputProcessor()],
-                [LossProcessor(), AccuracyProcessor()],
+                [LossProcessor(beta=1.0), AccuracyProcessor()],
                 [MetricProcessor(["loss", "accuracy"])],
                 [WandbMetricLogger("val", ["loss", "accuracy"], log_per_batch=False)],
             ]
