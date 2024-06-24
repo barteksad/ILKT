@@ -46,6 +46,7 @@ exp:
   batch_size: 32
   valid_batch_size: 32
   seed: 42
+  beta: 1
   training_steps: 1_000_000
   validate_every: 30_000
   n_examples_per_valid_dataset: 20_000

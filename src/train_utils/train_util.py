@@ -152,6 +152,10 @@ class ModelOutputProcessor(BatchProcessor):
 
 
 class LossProcessor(BatchProcessor):
+
+    def __init__(self, beta: float):
+        self.beta = beta
+
     def on_batch(
         self,
         model: ILKTModel,
@@ -165,7 +169,7 @@ class LossProcessor(BatchProcessor):
             elif isinstance(
                 dataloader.dataset, (MLMDataset, SentenceClassificationDataset)
             ):
-                loss = batch["model_outputs"].loss
+                loss = batch["model_outputs"].loss * self.beta
             else:
                 raise ValueError(f"Unknown dataset type {type(dataloader.dataset)}")
         return {"loss": loss}
@@ -302,12 +306,13 @@ class TrainBatchProcessStrategy(BatchProcessStrategy):
         monitor_stiffness_every: int,
         monitor_stiffness_steps: int,
         steps=None,
+        beta=1.0,
     ):
         if steps is None:
             steps = [
                 [ModelOutputProcessor()],
                 [
-                    LossProcessor(),
+                    LossProcessor(beta),
                     StiffnessMonitor(monitor_stiffness_every, monitor_stiffness_steps),
                 ],
                 [

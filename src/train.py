@@ -74,6 +74,7 @@ def main(config: DictConfig):
         model,
         monitor_stiffness_every=config.exp.monitor_stiffness_every,
         monitor_stiffness_steps=config.exp.monitor_stiffness_steps,
+        beta=config.exp.beta,
     )
     train_batch_processor.on_start(fabric)
 
