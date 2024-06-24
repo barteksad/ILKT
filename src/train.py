@@ -17,7 +17,7 @@ from train_utils.train_util import (
     TrainBatchProcessStrategy,
 )
 
-from dataset import SentenceClassificationDataset
+from dataset import SentenceClassificationDataset, ContrastiveDataset
 from train_utils.train_util import (
     create_optimizer_v2,
 )
