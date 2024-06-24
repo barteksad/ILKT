@@ -41,10 +41,10 @@ defaults:
 exp:
   log_dir: # set during runtime to automatically created dir
   pretrained_model_name_or_path: google-bert/bert-base-multilingual-cased
-  max_length: 512
-  contrastive_batch_size: 64
-  batch_size: 32
-  valid_batch_size: 32
+  max_length: 128
+  contrastive_batch_size: 16
+  batch_size: 8
+  valid_batch_size: 8
   seed: 42
   beta: 1
   training_steps: 1_000_000
