@@ -277,6 +277,11 @@ def create_meta(args: argparse.Namespace) -> None:
                     },
                     "metrics": metrics,
                 }
+
+                if " (default)" in yaml_result["dataset"]["name"]:
+                    yaml_result["dataset"]["name"] = yaml_result["dataset"][
+                        "name"
+                    ].replace(" (default)", "")
                 yaml_results.append(yaml_result)
 
     model_name = "PLACEHOLDER"

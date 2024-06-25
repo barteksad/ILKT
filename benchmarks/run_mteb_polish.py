@@ -38,7 +38,7 @@ transformer_model = Transformer(
     config_args={"trust_remote_code": True},
     model_args={"trust_remote_code": True},
     tokenizer_args={
-        "model_max_length": 512,
+        "model_max_length": 128,
     },
 )
 pooling = Pooling(transformer_model.get_word_embedding_dimension(), "cls")
